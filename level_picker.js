@@ -11,9 +11,9 @@ let currentLevel = 1;
 let lock_icon;
 let check_icon;
 let info_box;
-let level1Complete = true;
-let level2Complete = true;
-let level3Complete = true;
+let level1Complete = false;
+let level2Complete = false;
+let level3Complete = false;
 
 let levelShake = [0, 0, 0];
 const PANEL_CLOSED_X = 1600;
@@ -130,10 +130,14 @@ function drawLevelCircle(cx, cy, radius, unlocked, index) {
   // --- CHECKMARK FOR COMPLETED LEVELS ---
   let levelKey = "level" + (index + 1);
   if (bestStars[levelKey] >= 1)  {
-      // Draw checkmark slightly to the right of the circle
-      let checkX = cx + radius - 42;
-      let checkY = cy - radius + 25;
-      image(check_icon, checkX, checkY, 70, 70);
+    // Draw checkmark slightly to the right of the circle
+    let checkX = cx + radius - 42;
+    let checkY = cy - radius + 25;
+    image(check_icon, checkX, checkY, 70, 70);
+    // --- SIMPLE LEVEL UNLOCK LOGIC ---
+    if (bestStars["level1"] >= 1) level1Complete = true;
+    if (bestStars["level2"] >= 1) level2Complete = true;
+    if (bestStars["level3"] >= 1) level3Complete = true;
   }
 }
 
@@ -283,7 +287,6 @@ tutorialAlpha = 0;
 tutorialIndex = 0;
 tutorialDelay = tutorialSteps[0].delay;
 }
-
 
 // For fastest times
 function formatTime(t) {

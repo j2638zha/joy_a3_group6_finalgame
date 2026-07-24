@@ -38,26 +38,49 @@ let camZoom = 2; //change back to 2
 // Diagonal wall bounds
 const WALL_MARGIN = 10;
 const walls = [];
+let holes = [];
 
 // ---------------- GOAT SYSTEM ----------------
-let goatSprite;
-let goatFrames = [];
-let goatX = 0;
-let goatY = 0;
-let goatFrameIndex = 0;
-let goatActive = false;
-let goatStartTime = 0;
-let goatInitialized = false;
-let goatDirection = "left";
-let goatHasKilledOnce = false;   // has the tutorial kill already happened?
-let goatTriggered = false;       // generic “run across screen” trigger
-let goatTriggerTime = 0;         // when we started the countdown
-let goatSpeed = 6;               // movement speed
-let goatNextSpawnDelay = 3000;  // first retry goat comes after 3s
+// Goat state variables and ALL goat functions now live in level_3.js,
+// since the goat only ever appears in Level 3. This file still touches
+// a few of those globals (goatX/goatY in loadLevel(), goatInitialized/
+// goatDirection/goatTriggered/etc in draw()/handleInput()/resetGame()),
+// which is fine since they're plain globals — just know their
+// declarations and the goat rendering/update logic live over there now.
 
+// ---------------- HOLE FALL / CLIMB SYSTEM ----------------
+// States: "none" (normal play) -> "falling" -> "shaking" -> "climbing" -> "none"
+let holeState = "none";
+let activeHole = null;   // the hole object the player is currently inside
 
+let holeFallFrame = 0;
+let holeFallFrameTimer = 0;
 
+let holeClimbFrame = 0;
+let holeEnterFrame = 0;
 
+let holeShakeStartTime = 0;
+const HOLE_SHAKE_DURATION = 1500; // 3 seconds of screen shake
+let holeShakeOffsetX = 0;
+let holeShakeOffsetY = 0;
+const HOLE_SHAKE_MAGNITUDE = 8;   // pixels of shake, tweak for intensity
+
+const HOLE_IMMUNITY_MS = 5000;       // can't fall into the same hole again for 5s after climbing out
+const HOLE_TIME_PENALTY = 20;        // seconds docked from the timer on falling in
+const HOLE_TIMER_FLASH_FRAMES = 240; // 4 seconds @ 60fps red/white flash on the timer
+
+// ---- SIZE TUNING ----
+// Hole VISUAL size is controlled by the scale passed into drawHoles() below
+// (currently 0.85, see draw()). Hole COLLISION (fall-in) size is controlled
+// separately here as a fraction of that visual size, so you can make the
+// hole look one size but have a tighter/looser trigger radius.
+const HOLE_VISUAL_SCALE = 0.5;
+const HOLE_TRIGGER_RADIUS_FACTOR = 0.38; // fraction of hole width used as the fall-in radius
+
+// Fall/climb penguin animation size is controlled INDEPENDENTLY of the hole,
+// via SPRITES.fall.scale and SPRITES.climb.scale below. If the falling/
+// climbing penguin looks too big or small next to the hole, adjust those
+// two `scale` values — don't touch the HOLE_* constants above for that.
 
 const SPRITES = {
   up: {
@@ -74,20 +97,6 @@ const SPRITES = {
     cropRight: [0, 0, 20, 60, 90, 120],
     cropTop:   [0, 0, 0, 0, 0, 60],
     cropBottom:[180, 180, 180, 180, 180, 180]
-  },
-
-  start_penguin: {
-    img: null,
-    frameWidth: 155,
-    frameHeight: 152,
-    numFrames: 4,
-    animSpeed: 40,
-    scale: 3,
-
-    cropLeft:  [0, 10, 20, 20],
-    cropRight: [25, 20, 10, 5],
-    cropTop:   [0, 0, 0, 0],
-    cropBottom:[0, 0, 0, 0]
   },
 
   left: {
@@ -229,13 +238,55 @@ const SPRITES = {
   cropRight:  [10, 15, 20, 15, 10],
   cropTop:    [0, 0, 0, 0, 0],
   cropBottom: [0, 0, 0, 0, 0]
+},
 
-}
+  // ---- HOLE FALL / CLIMB ANIMATIONS (from the standalone climb/fall file) ----
+  climb: {
+    img: null,
+    frameWidth: 679,
+    frameHeight: 468,
+    numFrames: 6,
+    animSpeed: 12,
+    scale: 0.4,
+    offsetX: 4.8,
+    offsetY: -42,
+    cropLeft:   [0, 9, 20, 30, 40, 50],
+    cropRight:  [0, 0, 0, 0, 0, 0],
+    cropTop:    [0, 0, 0, 32, 0, 0],
+    cropBottom: [0, 0, 0, 0, 0, 0]
+  },
 
+  fall: {
+    img: null,
+    frameWidth: 679,
+    frameHeight: 419,
+    numFrames: 6,
+    animSpeed: 3,
+    scale: 0.4,
+    offsetX: 4.8,
+    offsetY: -33,
+    cropLeft:   [0, 10, 20, 30, 40, 50],
+    cropRight:  [0, 0, 0, 0, 0, 0],
+    cropTop:    [0, 0, 0, 32, 0, 0],
+    cropBottom: [0, 0, 0, 0, 0, 0]
+  },
 
+  enterButton: {
+    img: null,
+    frameWidth: 361,
+    frameHeight: 188,
+    numFrames: 6,
+    animSpeed: 4,
+    scale: 0.4,
+    offsetX: 4,
+    offsetY: -150,
+
+    cropLeft:   [0, 8, 13, 23, 26, 32],
+    cropRight:  [0, 0, 0, 0, 0, 0],
+    cropTop:    [0, 0, 0, 0, 0, 0],
+    cropBottom: [0, 0, 0, 0, 0, 0]
+  }
 };
-
-
 
 let player = {
   x: 0,
@@ -247,6 +298,29 @@ let player = {
   frameTimer: 0,
   direction: "up",
   isMoving: false,
+};
+
+// TIMER
+let totalTime = 10;
+const LEVEL_TIMES = {
+  1: 210,
+  2: 180,
+  3: 150 
+};
+let startTime;
+let timerStarted = false;
+let gameEnded = false;  
+let finalTime = null;
+let flashTimer = 0;
+let fastestTimes = {
+    level1: null,
+    level2: null,
+    level3: null
+};
+let fastestTimesIsNew = {
+    level1: false,
+    level2: false,
+    level3: false
 };
 
 // World-space Y where the penguin should spawn. This matches the
@@ -274,8 +348,6 @@ function loadLevel(levelNum) {
     goatX = WORLD_W_SCALED / 2 - 200;
     goatY = WORLD_H_SCALED / 2 + 200;
 }
-
-
   bgImg = img;
   WORLD_W = img.width;
   WORLD_H = img.height;
@@ -286,6 +358,9 @@ function loadLevel(levelNum) {
   if (levelNum === 1) finishY = LEVEL1_FINISH_Y;
   else if (levelNum === 2) finishY = LEVEL2_FINISH_Y;
   else if (levelNum === 3) finishY = LEVEL3_FINISH_Y;
+
+  // Timer
+  totalTime = LEVEL_TIMES[levelNum];
 
   // Fish
   let fishStart;
@@ -306,6 +381,15 @@ function loadLevel(levelNum) {
   if (levelNum === 1) spikes = LEVEL1_SPIKES.map(s => ({ ...s }));
   else if (levelNum === 2) spikes = LEVEL2_SPIKES.map(s => ({ ...s }));
   else if (levelNum === 3) spikes = LEVEL3_SPIKES.map(s => ({ ...s }));
+
+  // Crevices
+  if (levelNum === 1) holes = [];
+  else if (levelNum === 2) holes = LEVEL2_HOLES.map(h => ({ ...h }));
+  else if (levelNum === 3) holes = LEVEL3_HOLES.map(h => ({ ...h }));
+
+  // Reset the hole sequence whenever a level (re)loads
+  holeState = "none";
+  activeHole = null;
 
   // Spawn player, then figure out which side of each wall is "legal"
   player.x = WORLD_W_SCALED / 2;
@@ -337,24 +421,6 @@ let flashlight = {
   glowOpacity: 255, // outer white ring
 };
 
-// TIMER
-let totalTime = 180;
-let startTime;
-let timerStarted = false;
-let gameEnded = false;  
-let finalTime = null;
-let flashTimer = 0;
-let fastestTimes = {
-    level1: null,
-    level2: null,
-    level3: null
-};
-let fastestTimesIsNew = {
-    level1: false,
-    level2: false,
-    level3: false
-};
-
 //STOMPING ANIMATION
 let stompAnimating = false;
 let stompFrame = 0;
@@ -362,13 +428,14 @@ let stompFrameTimer = 0;
 const STOMP_FRAME_DURATIONS = [10, 10, 10, 10, 70, 10];
 const STOMP_NUM_FRAMES = 6;
 let waveActive = false;
-let waveRadius = 100;
-let waveMaxRadius = 730; 
+let waveRadius = 200;
+let waveMaxRadius = 630; 
 let waveGrowth = 25;
 let waveDelay = 0;
 let waveDelayActive = false;
 let blueBuffer;
 let ringMaskBuffer;
+let blizzardBuffer; // reused every frame in drawBlizzardOverlay() — see setup()
 let ringOffsetX = 0;
 let ringOffsetY = -50;
 let stompOffsetX = -5;
@@ -437,7 +504,6 @@ let bestStars = { //highest score tracker
 function preload() {
   gameFont = loadFont("assets/fonts/jersey10.ttf");
   SPRITES.up.img = loadImage("assets/images/w_key_penguin.png");
-  SPRITES.start_penguin.img = loadImage("assets/images/penguin_front.png");
   SPRITES.left.img = loadImage("assets/images/a_key_penguin.png");
   SPRITES.right.img = loadImage("assets/images/d_key_penguin.png");
   SPRITES.down.img = loadImage("assets/images/s_key_penguin.png");
@@ -454,6 +520,7 @@ function preload() {
   // Tutorial card assets (tutorial_cards.js)
   preloadTutorialAssets();
   preloadLevelPickerAssets();
+  preloadLevel2Assets();
 
   // Fishy stuff
   fishImg = loadImage("assets/images/test_fish.png");
@@ -476,6 +543,13 @@ function preload() {
 
  SPRITES.goat.img = loadImage("assets/images/goat_spritesheet.png");
 
+  // Hole fall/climb animation sheets + enter button (from the standalone file)
+  SPRITES.climb.img = loadImage("assets/images/penguin_climb.png");
+  SPRITES.fall.img = loadImage("assets/images/penguin_falling.png");
+  SPRITES.enterButton.img = loadImage("assets/images/enter_button_sprite.png");
+  // NOTE: `hole` (the crevice image used in drawHoles()) is assumed to
+  // already be loaded elsewhere in your project (e.g. preloadLevel2Assets()).
+  // Not reloading it here to avoid double-loading it.
 }
 
 function setup() {
@@ -485,6 +559,12 @@ function setup() {
   startTime = millis();
   blueBuffer  = createGraphics(VIEW_W, VIEW_H);
   ringMaskBuffer = createGraphics(VIEW_W, VIEW_H);
+  // Created ONCE and reused every frame in drawBlizzardOverlay(). The old
+  // code called createGraphics() inside draw() every frame, which allocated
+  // a brand-new offscreen canvas 60x/sec and never freed the old ones —
+  // that's what was causing the game to slow down more and more the longer
+  // you played.
+  blizzardBuffer = createGraphics(VIEW_W, VIEW_H);
   loadLevel(1);
 }
 
@@ -638,10 +718,66 @@ function drawFishIconUI() {
   }
 }
 
+function drawFishCompass() {
+  if (fish.collected) return;
+  if (!waveActive) return; // only show while the wave/ring is active
+
+  const scale = camZoom * bgScale;
+
+  // --- Ring center (same as the X-ray ring's cx/cy) ---
+  const cx = (player.x - camX) * scale + ringOffsetX;
+  const cy = (player.y - camY) * scale + ringOffsetY;
+
+  // --- WORLD direction vector toward the fish ---
+  const dx = fish.x - player.x;
+  const dy = fish.y - player.y;
+  const angle = atan2(dy, dx);
+  const radius = max(0, waveRadius - 70);
+
+  const iconX = cx + cos(angle) * radius;
+  const iconY = cy + sin(angle) * radius;
+
+  let fade = map(
+    waveRadius,
+    waveMaxRadius * 0.7,
+    waveMaxRadius,
+    255,
+    0
+  );
+
+  fade = constrain(fade, 0, 255);
+  push();
+  imageMode(CENTER);
+  drawingContext.shadowBlur = 18;
+  drawingContext.shadowColor = "rgba(52, 201, 235, 0.8)";
+  tint(255, fade);
+  image(fishImg, iconX, iconY, 75, 53);
+  drawingContext.shadowBlur = 0;
+  pop();
+}
+
 function randomizeFishPosition() {
   let spot = random(fishSpawns);   // p5.js random() picks a random element
   fish.x = spot.x;
   fish.y = spot.y;
+}
+
+function drawHoles(scale = 1) {
+  const baseW = hole.width;
+  const baseH = hole.height;
+
+  const drawW = baseW * scale;
+  const drawH = baseH * scale;
+
+  for (const h of holes) {
+    image(
+      hole,
+      h.x - drawW / 2,
+      h.y - drawH / 2,
+      drawW,
+      drawH
+    );
+  }
 }
 
 const START_BTN = { x: 430, y: 675, w: 330, h: 60 };
@@ -787,41 +923,37 @@ if (gameState === "transition") {
   if (!timerStarted) {
     timerStarted = true;
     startTime = millis();
-}
-
+  }
 
   handleInput();
   animateSprite();
   updateCamera();
   updateStompAnimation();
-  checkFishCollision(); 
+  checkFishCollision();
+  checkHoleCollision();
 
   // ---------------- GOAT INIT (only for Level 3) ----------------
-if (currentLevel === 3 && !goatInitialized) {
-    goatInitialized = true;
-    goatStartTime = millis();
-    goatDirection = random(["left", "right"]);
-  
-}
+  if (currentLevel === 3 && !goatInitialized) {
+      goatInitialized = true;
+      goatStartTime = millis();
+      goatDirection = random(["left", "right"]);
+  }
 
-
-
-  // --- BLOCK TOP EXIT IF FISH NOT COLLECTED ---
-  if (!fish.collected) {
-    if (player.y < WORLD_TOP_LIMIT + 40) {
-      // stop movement
-      player.y = WORLD_TOP_LIMIT + 40;
-
+  // While the penguin is falling/shaking/climbing in a hole, skip the
+  // top-exit fish gate and the win check — those only apply to normal play.
+  if (holeState === "none") {
+    // --- BLOCK TOP EXIT IF FISH NOT COLLECTED ---
+    if (!fish.collected && player.y < finishY) {
+      player.y = finishY;
       // trigger popup message
       needFishMessageActive = true;
       needFishMessageTimer = needFishMessageDuration;
     }
-  }
 
-// -------------------------
-// WIN CONDITION (correct)
-// -------------------------
-if (player.y < finishY && fish.collected) {
+    // -------------------------
+    // WIN CONDITION (correct)
+    // -------------------------
+    if (player.y < finishY && fish.collected) {
       let elapsed = floor((millis() - startTime) / 1000);
       finalTime = elapsed;
 
@@ -852,6 +984,7 @@ if (player.y < finishY && fish.collected) {
 
       gameState = "win";
       return;
+    }
   }
 
   // WAVE DELAY + WAVE UPDATE
@@ -868,32 +1001,59 @@ if (player.y < finishY && fish.collected) {
   }
 
   // DRAW WORLD
-  // DRAW WORLD
   push();
   scale(camZoom * bgScale);
   translate(-camX, -camY);
+  if (holeState === "shaking") {
+    // shake is expressed in screen pixels — divide by the current zoom/scale
+    // so it reads as a consistent shake regardless of camera zoom
+    translate(
+      holeShakeOffsetX / (camZoom * bgScale),
+      holeShakeOffsetY / (camZoom * bgScale)
+    );
+  }
   drawBackground();
   drawSpikes();
+  drawHoles(HOLE_VISUAL_SCALE);
   drawFish();
   drawSpikeHitboxes();
   drawWalls();
   pop();
 
   // ---------------- GOAT UPDATE ----------------
-if (currentLevel === 3) {
-    updateLevel3Goat();
-}
+  if (currentLevel === 3) {
+      updateLevel3Goat();
+  }
 
+  // ---------------- HOLE FALL / SHAKE / CLIMB SEQUENCE ----------------
+  if (holeState === "falling") {
+    updateHoleFall();
+    drawHoleFallAnimation();
+  } else if (holeState === "shaking") {
+    updateHoleShake();
+    // penguin stays hidden inside the hole during the shake
+  } else if (holeState === "climbing") {
+    drawHoleClimbAnimation();
+  } else {
+    // DRAW CHARACTER (normal play)
+    drawCharacterOnScreen();
+    drawPenguinHitbox();
+  }
 
-  // DRAW CHARACTER
-  drawCharacterOnScreen();
-  drawPenguinHitbox();
-
-  // Capture world frame for X-ray ring
-  baseWorldFrame = get();
+  // Capture world frame for X-ray ring — only needed while the wave/X-ray
+  // ring is actually active. get() does a full-canvas pixel readback, so
+  // doing it unconditionally every frame (as before) was wasted work the
+  // vast majority of the time.
+  if (waveActive) {
+    baseWorldFrame = get();
+  }
 
   // BLIZZARD OVERLAY
   drawBlizzardOverlay();
+
+  if (holeState === "climbing") {
+    drawEnterButtonAtHole();
+  }
 
   // X-RAY RING
   if (waveActive) {
@@ -904,7 +1064,7 @@ if (currentLevel === 3) {
     const cy = (player.y - camY) * camZoom * bgScale + ringOffsetY;
 
     const outerRadius = waveRadius;
-    const innerRadius = waveRadius - 80;
+    const innerRadius = waveRadius - 140;
 
     ringMaskBuffer.fill(255);
     ringMaskBuffer.circle(cx, cy, outerRadius * 2);
@@ -935,6 +1095,11 @@ if (currentLevel === 3) {
   // draw fish ui
   drawFishIconUI();
 
+  // fish compass during stomping
+  if (waveActive) {
+    drawFishCompass();
+  }
+
   // DEBUG: on-screen coordinates — walk the penguin around and read
   // these numbers off to build your walls/spikes/fish spots for new levels
   if (DEBUG_SHOW_COORDS) {
@@ -958,67 +1123,73 @@ if (currentLevel === 3) {
 
   // --- NEED FISH POPUP MESSAGE ---
  if (needFishMessageActive) {
-  needFishMessageTimer--;
-
-  push();
-  imageMode(CENTER);
-
-  const cardW = min(730, width - 160);
-  const cardH =
-    cardW * (popUpCard.height / popUpCard.width);
-
-  const cardY = 180; // moves the popup closer to the timer
-
-  image(
-    popUpCard,
-    width / 2,
-    cardY,
-    cardW,
-    cardH
-  );
-
-  pop();
-
-  if (needFishMessageTimer <= 0) {
-    needFishMessageActive = false;
-  }
-}
-
-if (foundFishMessageActive) {
-  foundFishMessageTimer--;
-
-  push();
-  imageMode(CENTER);
-
-  if (
-    foundPopupCard &&
-    foundPopupCard.width > 0 &&
-    foundPopupCard.height > 0
-  ) {
-    const cardW = min(750, width - 180);
-    const cardH =
-      cardW * (foundPopupCard.height / foundPopupCard.width);
-
-    const cardY = 180;
-
+    needFishMessageTimer--;
+    push();
+    imageMode(CENTER);
+    const cardW = min(730, width - 160);
+    const cardH = cardW * (popUpCard.height / popUpCard.width);
+    const cardY = 180; // moves the popup closer to the timer
     image(
-      foundPopupCard,
+      popUpCard,
       width / 2,
       cardY,
       cardW,
       cardH
     );
+    pop();
+    if (needFishMessageTimer <= 0) {
+      needFishMessageActive = false;
+    }
   }
 
-  pop();
-
-  if (foundFishMessageTimer <= 0) {
-    foundFishMessageActive = false;
+  if (foundFishMessageActive) {
+    foundFishMessageTimer--;
+    push();
+    imageMode(CENTER);
+    if (foundPopupCard && foundPopupCard.width > 0 && foundPopupCard.height > 0) {
+      const cardW = min(750, width - 180);
+      const cardH = cardW * (foundPopupCard.height / foundPopupCard.width);
+      const cardY = 180;
+      image(
+        foundPopupCard,
+        width / 2,
+        cardY,
+        cardW,
+        cardH
+      );
+    }
+    pop();
+    if (foundFishMessageTimer <= 0) {
+      foundFishMessageActive = false;
+    }
   }
-}
 }
 
 function keyPressed() {
+  // --- HOLE CLIMB INPUT (ENTER-mash to climb out) ---
+  if (holeState === "climbing" && keyCode === ENTER) {
+    const maxFrame = SPRITES.climb.numFrames - 1;
+
+    if (holeClimbFrame >= maxFrame) {
+      // final press — climb complete, pop out of the hole
+      exitHole();
+      return;
+    }
+
+    const canSlip = (holeClimbFrame === 1 || holeClimbFrame === 2);
+    const setbackChance = 0.3; // tweak as desired
+
+    if (Math.random() < setbackChance && canSlip) {
+      // slip backward one frame (penguin + button, same as the original file)
+      holeClimbFrame = holeClimbFrame - 1;
+      holeEnterFrame = Math.max(0, holeEnterFrame - 1);
+    } else {
+      holeClimbFrame = holeClimbFrame + 1;
+      holeEnterFrame = (holeEnterFrame + 1) % SPRITES.enterButton.numFrames;
+    }
+    return;
+  }
+
   // START SCREEN → ENTER → LEVEL PICKER
   if (gameState === "start" && keyCode === ENTER) {
       gameState = "level_picker";
@@ -1055,7 +1226,7 @@ function resetGame() {
   timerStarted = false;
   finalTime = null;
 
-  totalTime = 180;   // reset timer
+  totalTime = LEVEL_TIMES[currentLevel];   // reset timer
   flashTimer = 0;
 
   // reset tutorial state (tutorial_cards.js)
@@ -1072,6 +1243,17 @@ function resetGame() {
 
   fish.collected = false;
   randomizeFishPosition();
+
+  // HOLE SEQUENCE RESET
+  holeState = "none";
+  activeHole = null;
+  holeFallFrame = 0;
+  holeFallFrameTimer = 0;
+  holeClimbFrame = 0;
+  holeEnterFrame = 0;
+  for (const h of holes) {
+    h.immuneUntil = 0;
+  }
 
   // GOAT RESET LOGIC
   goatActive = false;
@@ -1202,6 +1384,13 @@ function handleInput() {
   // only when tutorialActive is false, i.e. normal play and the gap
   // between the flashlight card and the space card.
   if (tutorialActive) {
+    player.isMoving = false;
+    return;
+  }
+
+  // Movement AND stomp are disabled the entire time the penguin is
+  // falling / shaking / climbing in a hole.
+  if (holeState !== "none") {
     player.isMoving = false;
     return;
   }
@@ -1423,6 +1612,158 @@ function checkFishCollision() {
   }
 }
 
+// ------------------------------------------------------------
+// HOLE FALL / SHAKE / CLIMB SYSTEM
+// ------------------------------------------------------------
+
+// Checks whether the penguin has walked into any hole. Only runs during
+// normal play (holeState === "none"), and skips holes the penguin is
+// still immune to after just having climbed out of them.
+function checkHoleCollision() {
+  if (holeState !== "none") return;
+  if (typeof hole === "undefined" || !hole) return; // hole image not loaded yet
+
+  for (const h of holes) {
+    if (h.immuneUntil && millis() < h.immuneUntil) continue;
+
+    const holeRadius = (hole.width * HOLE_VISUAL_SCALE) * HOLE_TRIGGER_RADIUS_FACTOR;
+    const d = dist(player.x, player.y, h.x, h.y);
+
+    if (d < holeRadius) {
+      enterHole(h);
+      break;
+    }
+  }
+}
+
+// Kicks off the fall sequence: freezes the penguin over the hole,
+// applies the time penalty + timer flash, and starts the fall animation.
+function enterHole(h) {
+  holeState = "falling";
+  activeHole = h;
+
+  // Snap the penguin to the hole so the camera settles right over it
+  player.x = h.x;
+  player.y = h.y;
+  player.isMoving = false;
+
+  holeFallFrame = 0;
+  holeFallFrameTimer = 0;
+
+  // Time penalty + red/white flash on the timer
+  totalTime = max(0, totalTime - HOLE_TIME_PENALTY);
+  flashTimer = HOLE_TIMER_FLASH_FRAMES;
+}
+
+// Advances the fall animation; once the last frame has played, moves on
+// to the screen-shake stage.
+function updateHoleFall() {
+  const cfg = SPRITES.fall;
+  holeFallFrameTimer++;
+
+  if (holeFallFrameTimer >= cfg.animSpeed) {
+    holeFallFrameTimer = 0;
+
+    if (holeFallFrame < cfg.numFrames - 1) {
+      holeFallFrame++;
+    } else {
+      holeState = "shaking";
+      holeShakeStartTime = millis();
+    }
+  }
+}
+
+// Runs the 3-second screen shake, then hands off to the climb stage.
+function updateHoleShake() {
+  const elapsed = millis() - holeShakeStartTime;
+
+  holeShakeOffsetX = random(-HOLE_SHAKE_MAGNITUDE, HOLE_SHAKE_MAGNITUDE);
+  holeShakeOffsetY = random(-HOLE_SHAKE_MAGNITUDE, HOLE_SHAKE_MAGNITUDE);
+
+  if (elapsed >= HOLE_SHAKE_DURATION) {
+    holeShakeOffsetX = 0;
+    holeShakeOffsetY = 0;
+    holeState = "climbing";
+    holeClimbFrame = 0;
+    holeEnterFrame = 0;
+  }
+}
+
+// Pops the penguin back out at the hole, in the idle "W" pose, and grants
+// that hole a temporary immunity window so the player can walk away first.
+function exitHole() {
+  activeHole.immuneUntil = millis() + HOLE_IMMUNITY_MS;
+
+  player.direction = "up";
+  player.currentFrame = 1; // idle "W" position, frame index 1
+  player.frameTimer = 0;
+  player.isMoving = false;
+
+  holeState = "none";
+  activeHole = null;
+}
+
+function drawHoleFallAnimation() {
+  const cfg = SPRITES.fall;
+  const f = holeFallFrame;
+  const cropL = cfg.cropLeft[f] || 0;
+  const cropR = cfg.cropRight[f] || 0;
+  const cropT = cfg.cropTop[f] || 0;
+  const cropB = cfg.cropBottom[f] || 0;
+  const sx = f * cfg.frameWidth + cropL;
+  const sy = cropT;
+  const sw = cfg.frameWidth - cropL - cropR;
+  const sh = cfg.frameHeight - cropT - cropB;
+  const dw = sw * cfg.scale;
+  const dh = sh * cfg.scale;
+  const offsetX = cfg.offsetX || 0;
+  const offsetY = cfg.offsetY || 0;
+  const screenX = (activeHole.x - camX) * camZoom * bgScale - dw / 2 + offsetX;
+  const screenY = (activeHole.y - camY) * camZoom * bgScale - dh / 2 + offsetY;
+
+  image(cfg.img, screenX, screenY, dw, dh, sx, sy, sw, sh);
+}
+
+function drawHoleClimbAnimation() {
+  const cfg = SPRITES.climb;
+  const f = holeClimbFrame;
+  const cropL = cfg.cropLeft[f] || 0;
+  const cropR = cfg.cropRight[f] || 0;
+  const cropT = cfg.cropTop[f] || 0;
+  const cropB = cfg.cropBottom[f] || 0;
+  const sx = f * cfg.frameWidth + cropL;
+  const sy = cropT;
+  const sw = cfg.frameWidth - cropL - cropR;
+  const sh = cfg.frameHeight - cropT - cropB;
+  const dw = sw * cfg.scale;
+  const dh = sh * cfg.scale;
+  const offsetX = cfg.offsetX || 0;
+  const offsetY = cfg.offsetY || 0;
+  const screenX = (activeHole.x - camX) * camZoom * bgScale - dw / 2 + offsetX;
+  const screenY = (activeHole.y - camY) * camZoom * bgScale - dh / 2 + offsetY;
+  image(cfg.img, screenX, screenY, dw, dh, sx, sy, sw, sh);
+}
+
+function drawEnterButtonAtHole() {
+  const cfg = SPRITES.enterButton;
+  const f = holeEnterFrame;
+  const cropL = cfg.cropLeft[f] || 0;
+  const cropR = cfg.cropRight[f] || 0;
+  const cropT = cfg.cropTop[f] || 0;
+  const cropB = cfg.cropBottom[f] || 0;
+  const sx = f * cfg.frameWidth + cropL;
+  const sy = cropT;
+  const sw = cfg.frameWidth - cropL - cropR;
+  const sh = cfg.frameHeight - cropT - cropB;
+  const dw = sw * cfg.scale;
+  const dh = sh * cfg.scale;
+  const offsetX = cfg.offsetX || 0;
+  const offsetY = cfg.offsetY || 0;
+  const screenX = (activeHole.x - camX) * camZoom * bgScale - dw / 2 + offsetX;
+  const screenY = (activeHole.y - camY) * camZoom * bgScale - dh + offsetY;
+  image(cfg.img, screenX, screenY, dw, dh, sx, sy, sw, sh);
+}
+
 function animateSprite() {
   let cfg = SPRITES[player.direction];
 
@@ -1524,21 +1865,32 @@ function startWaveForFrame(frameIndex) {
 }
 
 function drawBlizzardOverlay() {
-  let stormLayer = createGraphics(width, height);
+  // Reused every frame instead of createGraphics()'d from scratch. The old
+  // version allocated a brand-new offscreen canvas every single frame and
+  // never freed it — that's what was causing the game to slow down more
+  // and more the longer you played, especially noticeable after finishing
+  // a level and continuing to play. blizzardBuffer is created once, in
+  // setup().
+  blizzardBuffer.clear();
+  // Composite mode persists on the buffer between frames since we're no
+  // longer recreating it — reset to normal drawing mode before the fresh
+  // fill/rect below, or last frame's "destination-out" cutout mode would
+  // carry over and erase instead of draw.
+  blizzardBuffer.drawingContext.globalCompositeOperation = "source-over";
 
   // Full white blizzard layer
-  stormLayer.noStroke();
-  stormLayer.fill(255, 255, 255, 200); // change opacity back to 253 after debugging
-  stormLayer.rect(0, 0, width, height);
+  blizzardBuffer.noStroke();
+  blizzardBuffer.fill(255, 255, 255, 253); // change opacity back to 253 after debugging
+  blizzardBuffer.rect(0, 0, width, height);
 
   // Convert penguin world → screen
   const px = (player.x - camX) * camZoom * bgScale + holeOffsetX;
   const py = (player.y - camY) * camZoom * bgScale + holeOffsetY;
 
   // --- 1. KEEP ORIGINAL CIRCLE CUT-OUT ---
-  stormLayer.drawingContext.globalCompositeOperation = "destination-out";
-  stormLayer.fill(255);
-  stormLayer.ellipse(px, py, clearRadius * 2, clearRadius * 2);
+  blizzardBuffer.drawingContext.globalCompositeOperation = "destination-out";
+  blizzardBuffer.fill(255);
+  blizzardBuffer.ellipse(px, py, clearRadius * 2, clearRadius * 2);
 
   // --- 2. ADD FLASHLIGHT CONE CUT-OUT ON TOP ---
   // Determine angle
@@ -1564,84 +1916,84 @@ function drawBlizzardOverlay() {
   // Direction-specific flashlight length
   let len = (sprite.flashlightLength ?? flashlight.length) * camZoom * bgScale;
 
-  stormLayer.push();
-  stormLayer.translate(px + offX, py + offY);
-  stormLayer.rotate(angle);
+  blizzardBuffer.push();
+  blizzardBuffer.translate(px + offX, py + offY);
+  blizzardBuffer.rotate(angle);
 
-  stormLayer.beginShape();
-  stormLayer.vertex(-flashlight.baseWidth/2, 0);
-  stormLayer.vertex(flashlight.baseWidth/2, 0);
-  stormLayer.vertex(flashlight.endWidth/2, len);
-  stormLayer.vertex(-flashlight.endWidth/2, len);
-  stormLayer.endShape(CLOSE);
+  blizzardBuffer.beginShape();
+  blizzardBuffer.vertex(-flashlight.baseWidth/2, 0);
+  blizzardBuffer.vertex(flashlight.baseWidth/2, 0);
+  blizzardBuffer.vertex(flashlight.endWidth/2, len);
+  blizzardBuffer.vertex(-flashlight.endWidth/2, len);
+  blizzardBuffer.endShape(CLOSE);
 
-  stormLayer.pop();
+  blizzardBuffer.pop();
 
   // Draw final blizzard layer
-  image(stormLayer, 0, 0);
+  image(blizzardBuffer, 0, 0);
 }
 
 function mousePressed() {
-    // --- TUTORIAL MOUSE INPUT (tutorial_cards.js) ---
-    if (handleTutorialMousePressed()) return;
+  // --- TUTORIAL MOUSE INPUT (tutorial_cards.js) ---
+  if (handleTutorialMousePressed()) return;
 
-    // --- PLAY BUTTON PRESS (inside info panel) ---
-    if (gameState === "level_picker" && activePanelIndex !== -1) {
-      if (levelPanels[activePanelIndex].playHover) {
-        playBtnPressed[activePanelIndex] = true;
-      }
+  // --- PLAY BUTTON PRESS (inside info panel) ---
+  if (gameState === "level_picker" && activePanelIndex !== -1) {
+    if (levelPanels[activePanelIndex].playHover) {
+      playBtnPressed[activePanelIndex] = true;
     }
-
-    // --- LEVEL PICKER CLICK ---
-    if (gameState === "level_picker") {
-        handleLevelPickerClick();
-        return;
-    }
-
-    /// --- START SCREEN BUTTON PRESS ---
-if (gameState === "start") {
-  if (mouseX > START_BTN.x && mouseX < START_BTN.x + START_BTN.w &&
-      mouseY > START_BTN.y && mouseY < START_BTN.y + START_BTN.h) {
-    startBtnPressed = true;
   }
-  return;
-}
 
-    // --- WIN SCREEN BUTTON ---
-    if (gameState === "win") {
-        let bx = width/2;
-        let by = height * 0.82;
-        let bw = 320;
-        let bh = 64;
+  // --- LEVEL PICKER CLICK ---
+  if (gameState === "level_picker") {
+      handleLevelPickerClick();
+      return;
+  }
 
-        if (mouseX > bx-bw/2 && mouseX < bx+bw/2 &&
-            mouseY > by-bh/2 && mouseY < by+bh/2) {
-            winBtnPressed = true;
-        }
+  /// --- START SCREEN BUTTON PRESS ---
+  if (gameState === "start") {
+      if (mouseX > START_BTN.x && mouseX < START_BTN.x + START_BTN.w &&
+          mouseY > START_BTN.y && mouseY < START_BTN.y + START_BTN.h) {
+        startBtnPressed = true;
+      }
+      return;
+  }
+
+  // --- WIN SCREEN BUTTON ---
+  if (gameState === "win") {
+    let bx = width/2;
+    let by = height * 0.82;
+    let bw = 320;
+    let bh = 64;
+
+    if (mouseX > bx-bw/2 && mouseX < bx+bw/2 &&
+         mouseY > by-bh/2 && mouseY < by+bh/2) {
+        winBtnPressed = true;
     }
+  }
 
     // --- LOSS SCREEN BUTTON ---
-    if (gameState === "loss") {
-        let bx = width/2;
-        let by = height * 0.45;
-        let bw = 320;
-        let bh = 64;
+  if (gameState === "loss") {
+    let bx = width/2;
+    let by = height * 0.45;
+    let bw = 320;
+    let bh = 64;
 
-        if (mouseX > bx-bw/2 && mouseX < bx+bw/2 &&
-            mouseY > by-bh/2 && mouseY < by+bh/2) {
-            lossBtnPressed = true;
-        }
+    if (mouseX > bx-bw/2 && mouseX < bx+bw/2 &&
+        mouseY > by-bh/2 && mouseY < by+bh/2) {
+        lossBtnPressed = true;
+    }
     }
 
-    // --- LEVEL PICKER BUTTON (win + loss screens) ---
-    if (gameState === "win" || gameState === "loss") {
-      let bx = width/2, by = height*0.90, bw = 320, bh = 56;
+  // --- LEVEL PICKER BUTTON (win + loss screens) ---
+  if (gameState === "win" || gameState === "loss") {
+    let bx = width/2, by = height*0.90, bw = 320, bh = 56;
 
-      if (mouseX > bx-bw/2 && mouseX < bx+bw/2 &&
-          mouseY > by-bh/2 && mouseY < by+bh/2) {
-        levelPickerBtnPressed = true;
-      }
+    if (mouseX > bx-bw/2 && mouseX < bx+bw/2 &&
+      mouseY > by-bh/2 && mouseY < by+bh/2) {
+      levelPickerBtnPressed = true;
     }
+  }
 }
 
 function mouseReleased() {
@@ -1720,226 +2072,4 @@ if (levelPickerBtnPressed && lpHover) {
     winBtnPressed = false;
     return;
   }
-}
-
-// ------------------------------------------------------------
-// GOAT FUNCTIONS
-// ------------------------------------------------------------
-// ------------------------------------------------------------
-// GOAT SYSTEM — CLEAN FINAL VERSION
-// ------------------------------------------------------------
-
-// Get a goat frame from the correct row (0 = left, 1 = right)
-function getGoatFrame(index, row) {
-    const cfg = SPRITES.goat;
-
-    const fw = cfg.frameWidth;
-    const fh = cfg.frameHeight;
-
-    // ⭐ Correct column for 5-wide sheet
-    const col = index % cfg.numFrames;   // numFrames = 5
-
-    return cfg.img.get(
-        col * fw + cfg.cropLeft[index],
-        row * fh + cfg.cropTop[index],
-        fw - cfg.cropLeft[index] - cfg.cropRight[index],
-        fh - cfg.cropTop[index] - cfg.cropBottom[index]
-    );
-}
-
-// Goat movement + animation
-function updateGoat() {
-    // Use correct frame count (4 frames per row)
-    let cfg = (goatDirection === "left") ? SPRITES.goat_left : SPRITES.goat_right;
-    if (frameCount % SPRITES.goat.animSpeed === 0) {
-    goatFrameIndex = (goatFrameIndex + 1) % SPRITES.goat.numFrames;
-}
-
-    // Move goat
-  const goatSpeed = 0.8;   // slow enough to see each frame clearly
-
-if (goatDirection === "right") {
-    goatX += goatSpeed;
-} else {
-    goatX -= goatSpeed;
-}
-
-}
-
-// Draw goat inside world transform (fixes jitter)
-function drawGoat() {
-    const cfg = SPRITES.goat;
-
-    // Row 0 = RIGHT, Row 1 = LEFT
-    let row = (goatDirection === "right") ? 0 : 1;
-
-    const frame = getGoatFrame(goatFrameIndex, row);
-
-    push();
-    scale(camZoom * bgScale);
-    translate(-camX, -camY);
-
-    image(
-        frame,
-        goatX,
-        goatY,
-        frame.width * cfg.scale,
-        frame.height * cfg.scale
-    );
-
-    pop();
-}
-
-
-
-// Collision with penguin → loss screen
-function checkGoatCollision() {
-    const penguinHitbox = {
-        x: player.x + PENGUIN_HITBOX.offsetX,
-        y: player.y + PENGUIN_HITBOX.offsetY,
-        w: PENGUIN_HITBOX.w,
-        h: PENGUIN_HITBOX.h
-    };
-
-    const goatHitbox = {
-        x: goatX,
-        y: goatY,
-        w: 120,   // adjust if needed
-        h: 120
-    };
-
-    if (rectOverlap(penguinHitbox, goatHitbox)) {
-        gameState = "loss";
-    }
-}
-
-// Rectangle overlap helper
-function rectOverlap(a, b) {
-    return !(
-        a.x + a.w < b.x ||
-        a.x > b.x + b.w ||
-        a.y + a.h < b.y ||
-        a.y > b.y + b.h
-    );
-}
-
-// Main Level 3 goat logic
-function updateLevel3Goat() {
-  if (!WORLD_W_SCALED || !WORLD_H_SCALED) return;
-
-  // -------------------------
-  // 1) SPAWN LOGIC
-  // -------------------------
-
-  // FIRST RUN: 1s after W press, always from right → left
-  if (!goatHasKilledOnce && goatTriggered && !goatActive) {
-    if (millis() - goatTriggerTime >= 500) {
-      goatActive = true;
-      goatDirection = "left";
-      goatX = WORLD_W_SCALED + 200;
-      goatY = player.y;
-
-      // prevent repeat
-      goatTriggered = false;
-    }
-  }
-
-  // RETRY RUNS: goats spawn repeatedly every few seconds
-  if (goatHasKilledOnce) {
-    // If no goat active, spawn a new one after a random delay
-    if (!goatActive && millis() - goatTriggerTime >= goatNextSpawnDelay) {
-
-      goatActive = true;
-
-      // Random side
-      if (random() < 0.5) {
-        goatDirection = "right";      // run right
-        goatX = -200;                 // left side
-      } else {
-        goatDirection = "left";       // run left
-        goatX = WORLD_W_SCALED + 200; // right side
-      }
-
-      // Random Y anywhere on mountain
-      goatY = random(200, WORLD_H_SCALED - 200);
-
-      // Set next spawn delay (2–5 seconds)
-      goatNextSpawnDelay = random(800, 1800);
-      goatTriggerTime = millis();
-    }
-  }
-
-  if (!goatActive) return;
-
-  // -------------------------
-  // 2) MOVE GOAT
-  // -------------------------
-  if (goatDirection === "left") {
-    goatX -= goatSpeed;
-  } else {
-    goatX += goatSpeed;
-  }
-
-  // -------------------------
-  // 3) ANIMATE GOAT
-  // -------------------------
-  goatFrameIndex = (goatFrameIndex + 1) % SPRITES.goat.numFrames;
-
-  // -------------------------
-  // 4) DRAW GOAT (with flip)
-  // -------------------------
-  push();
-  scale(camZoom * bgScale);
-  translate(-camX, -camY);
-
-  let cfg = SPRITES.goat;
-  let frameW = cfg.frameWidth;
-  let frameH = cfg.frameHeight;
-  let sx = goatFrameIndex * frameW;
-
-  if (goatDirection === "left") {
-    push();
-    translate(goatX + frameW * cfg.scale, goatY - frameH * cfg.scale);
-    scale(-1, 1);
-    image(cfg.img, 0, 0, frameW * cfg.scale, frameH * cfg.scale, sx, 0, frameW, frameH);
-    pop();
-  } else {
-    image(cfg.img, goatX, goatY - frameH * cfg.scale,
-          frameW * cfg.scale, frameH * cfg.scale,
-          sx, 0, frameW, frameH);
-  }
-
-  pop();
-
-  // -------------------------
-  // 5) COLLISION WITH PENGUIN
-  // -------------------------
-  let goatHitX = goatX;
-  let goatHitY = goatY - (frameH * cfg.scale);
-  let goatHitW = frameW * cfg.scale;
-  let goatHitH = frameH * cfg.scale;
-
-  let penguinHitX = player.x + PENGUIN_HITBOX.offsetX;
-  let penguinHitY = player.y + PENGUIN_HITBOX.offsetY;
-  let penguinHitW = PENGUIN_HITBOX.w;
-  let penguinHitH = PENGUIN_HITBOX.h;
-
-  if (
-    goatHitX < penguinHitX + penguinHitW &&
-    goatHitX + goatHitW > penguinHitX &&
-    goatHitY < penguinHitY + penguinHitH &&
-    goatHitY + goatHitH > penguinHitY
-  ) {
-    gameEnded = true;
-    gameState = "loss";
-
-    goatHasKilledOnce = true;
-    goatActive = false;
-  }
-
-  // -------------------------
-  // 6) DESPAWN WHEN OFF-SCREEN
-  // -------------------------
-  if (goatDirection === "left" && goatX < -400) goatActive = false;
-  if (goatDirection === "right" && goatX > WORLD_W_SCALED + 400) goatActive = false;
 }

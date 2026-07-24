@@ -1,19 +1,18 @@
-
-
-/*for catherine: Holes for level 3:
-  { x: 552, y: 1122},
-  { x: 966, y: 1157},
-  { x: 889, y: 702},
-  { x: 632, y: 869},
-  { x: 282, y: 947},
-  { x: 329, y: 569},
-  { x: 633, y: 459}, */
-
 const LEVEL3_FISH_SPAWNS = [
   { x: 85, y: 1502},
   { x: 1124, y: 1517},
   { x: 735, y: 1032},
 ];
+
+const LEVEL3_HOLES = [
+  { x: 585, y: 1122},
+  { x: 966, y: 1157},
+  { x: 889, y: 702},
+  { x: 645, y: 869},
+  { x: 282, y: 947},
+  { x: 329, y: 569},
+  { x: 633, y: 459},
+]
 
 function getLevel3FishStart(WORLD_W_SCALED, WORLD_H_SCALED) {
   return {
@@ -200,3 +199,247 @@ const LEVEL3_TOP_OFFSET = 550;
 
 // World Y coordinate of the finish line for Level 3.
 const LEVEL3_FINISH_Y = 391; // <- replace once you have Level 3's background
+
+// ------------------------------------------------------------
+// GOAT SYSTEM
+// ------------------------------------------------------------
+// Moved here from sketch.js since the goat only ever appears in Level 3.
+// These are plain globals (like everything else in this project), so
+// sketch.js can still read/write goatX, goatInitialized, etc. from
+// loadLevel(), draw(), handleInput() and resetGame() as before — only
+// the declarations and the goat-specific logic itself live here now.
+//
+// NOTE: getGoatFrame(), updateGoat(), drawGoat(), checkGoatCollision(),
+// and rectOverlap() below are NOT called anywhere — the actual goat
+// spawn/move/animate/collide logic lives entirely inside
+// updateLevel3Goat(), which IS called every frame from draw() in
+// sketch.js. Left them in (moved, not deleted) since removing working
+// code you didn't ask me to remove felt like the wrong call — but if you
+// don't have another use planned for them, they're safe to delete.
+
+let goatSprite;
+let goatFrames = [];
+let goatX = 0;
+let goatY = 0;
+let goatFrameIndex = 0;
+let goatActive = false;
+let goatStartTime = 0;
+let goatInitialized = false;
+let goatDirection = "left";
+let goatHasKilledOnce = false;   // has the tutorial kill already happened?
+let goatTriggered = false;       // generic “run across screen” trigger
+let goatTriggerTime = 0;         // when we started the countdown
+let goatSpeed = 6;               // movement speed
+let goatNextSpawnDelay = 3000;  // first retry goat comes after 3s
+
+// Get a goat frame from the correct row (0 = left, 1 = right)
+function getGoatFrame(index, row) {
+    const cfg = SPRITES.goat;
+
+    const fw = cfg.frameWidth;
+    const fh = cfg.frameHeight;
+
+    // ⭐ Correct column for 5-wide sheet
+    const col = index % cfg.numFrames;   // numFrames = 5
+
+    return cfg.img.get(
+        col * fw + cfg.cropLeft[index],
+        row * fh + cfg.cropTop[index],
+        fw - cfg.cropLeft[index] - cfg.cropRight[index],
+        fh - cfg.cropTop[index] - cfg.cropBottom[index]
+    );
+}
+
+// Goat movement + animation
+function updateGoat() {
+    // Use correct frame count (4 frames per row)
+    let cfg = (goatDirection === "left") ? SPRITES.goat_left : SPRITES.goat_right;
+    if (frameCount % SPRITES.goat.animSpeed === 0) {
+    goatFrameIndex = (goatFrameIndex + 1) % SPRITES.goat.numFrames;
+}
+
+    // Move goat
+  const goatSpeed = 0.8;   // slow enough to see each frame clearly
+
+if (goatDirection === "right") {
+    goatX += goatSpeed;
+} else {
+    goatX -= goatSpeed;
+}
+
+}
+
+// Draw goat inside world transform (fixes jitter)
+function drawGoat() {
+    const cfg = SPRITES.goat;
+
+    // Row 0 = RIGHT, Row 1 = LEFT
+    let row = (goatDirection === "right") ? 0 : 1;
+
+    const frame = getGoatFrame(goatFrameIndex, row);
+
+    push();
+    scale(camZoom * bgScale);
+    translate(-camX, -camY);
+
+    image(
+        frame,
+        goatX,
+        goatY,
+        frame.width * cfg.scale,
+        frame.height * cfg.scale
+    );
+    pop();
+}
+
+// Collision with penguin → loss screen
+function checkGoatCollision() {
+    const penguinHitbox = {
+        x: player.x + PENGUIN_HITBOX.offsetX,
+        y: player.y + PENGUIN_HITBOX.offsetY,
+        w: PENGUIN_HITBOX.w,
+        h: PENGUIN_HITBOX.h
+    };
+
+    const goatHitbox = {
+        x: goatX,
+        y: goatY,
+        w: 120,   // adjust if needed
+        h: 120
+    };
+
+    if (rectOverlap(penguinHitbox, goatHitbox)) {
+        gameState = "loss";
+    }
+}
+
+// Rectangle overlap helper
+function rectOverlap(a, b) {
+    return !(
+        a.x + a.w < b.x ||
+        a.x > b.x + b.w ||
+        a.y + a.h < b.y ||
+        a.y > b.y + b.h
+    );
+}
+
+// Main Level 3 goat logic — this is the one actually called from draw().
+function updateLevel3Goat() {
+  if (!WORLD_W_SCALED || !WORLD_H_SCALED) return;
+
+  // -------------------------
+  // 1) SPAWN LOGIC
+  // -------------------------
+
+  // FIRST RUN: 1s after W press, always from right → left
+  if (!goatHasKilledOnce && goatTriggered && !goatActive) {
+    if (millis() - goatTriggerTime >= 500) {
+      goatActive = true;
+      goatDirection = "left";
+      goatX = WORLD_W_SCALED + 200;
+      goatY = player.y;
+
+      // prevent repeat
+      goatTriggered = false;
+    }
+  }
+
+  // RETRY RUNS: goats spawn repeatedly every few seconds
+  if (goatHasKilledOnce) {
+    // If no goat active, spawn a new one after a random delay
+    if (!goatActive && millis() - goatTriggerTime >= goatNextSpawnDelay) {
+
+      goatActive = true;
+
+      // Random side
+      if (random() < 0.5) {
+        goatDirection = "right";      // run right
+        goatX = -200;                 // left side
+      } else {
+        goatDirection = "left";       // run left
+        goatX = WORLD_W_SCALED + 200; // right side
+      }
+
+      // Random Y anywhere on mountain
+      goatY = random(200, WORLD_H_SCALED - 200);
+
+      // Set next spawn delay (2–5 seconds)
+      goatNextSpawnDelay = random(800, 1800);
+      goatTriggerTime = millis();
+    }
+  }
+
+  if (!goatActive) return;
+
+  // -------------------------
+  // 2) MOVE GOAT
+  // -------------------------
+  if (goatDirection === "left") {
+    goatX -= goatSpeed;
+  } else {
+    goatX += goatSpeed;
+  }
+
+  // -------------------------
+  // 3) ANIMATE GOAT
+  // -------------------------
+  goatFrameIndex = (goatFrameIndex + 1) % SPRITES.goat.numFrames;
+
+  // -------------------------
+  // 4) DRAW GOAT (with flip)
+  // -------------------------
+  push();
+  scale(camZoom * bgScale);
+  translate(-camX, -camY);
+
+  let cfg = SPRITES.goat;
+  let frameW = cfg.frameWidth;
+  let frameH = cfg.frameHeight;
+  let sx = goatFrameIndex * frameW;
+
+  if (goatDirection === "left") {
+    push();
+    translate(goatX + frameW * cfg.scale, goatY - frameH * cfg.scale);
+    scale(-1, 1);
+    image(cfg.img, 0, 0, frameW * cfg.scale, frameH * cfg.scale, sx, 0, frameW, frameH);
+    pop();
+  } else {
+    image(cfg.img, goatX, goatY - frameH * cfg.scale,
+          frameW * cfg.scale, frameH * cfg.scale,
+          sx, 0, frameW, frameH);
+  }
+
+  pop();
+
+  // -------------------------
+  // 5) COLLISION WITH PENGUIN
+  // -------------------------
+  let goatHitX = goatX;
+  let goatHitY = goatY - (frameH * cfg.scale);
+  let goatHitW = frameW * cfg.scale;
+  let goatHitH = frameH * cfg.scale;
+
+  let penguinHitX = player.x + PENGUIN_HITBOX.offsetX;
+  let penguinHitY = player.y + PENGUIN_HITBOX.offsetY;
+  let penguinHitW = PENGUIN_HITBOX.w;
+  let penguinHitH = PENGUIN_HITBOX.h;
+
+  if (
+    goatHitX < penguinHitX + penguinHitW &&
+    goatHitX + goatHitW > penguinHitX &&
+    goatHitY < penguinHitY + penguinHitH &&
+    goatHitY + goatHitH > penguinHitY
+  ) {
+    gameEnded = true;
+    gameState = "loss";
+
+    goatHasKilledOnce = true;
+    goatActive = false;
+  }
+
+  // -------------------------
+  // 6) DESPAWN WHEN OFF-SCREEN
+  // -------------------------
+  if (goatDirection === "left" && goatX < -400) goatActive = false;
+  if (goatDirection === "right" && goatX > WORLD_W_SCALED + 400) goatActive = false;
+}

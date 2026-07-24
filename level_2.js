@@ -1,11 +1,26 @@
 // level_2.js file
 
-/*for catherine: Holes for level 2
-  { x: 622, y: 923},
-  { x: 851, y: 1090},
-  { x: 232, y: 891},
-  { x: 373, y: 724},
-  { x: 820, y: 698},*/
+const LEVEL2_HOLES = [
+  { x: 622, y: 923 },
+  { x: 880, y: 1040 },
+  { x: 232, y: 891 },
+  { x: 373, y: 724 },
+  { x: 820, y: 698 },
+  { x: 70, y: 1277 },
+  { x: 150, y: 1277 },
+  { x: 230, y: 1277 },
+  { x: 310, y: 1277 },
+  { x: 390, y: 1277 },
+  { x: 470, y: 1277 },
+  { x: 550, y: 1277 },
+  { x: 630, y: 1277 },
+  { x: 710, y: 1277 },
+  { x: 790, y: 1277 },
+  { x: 870, y: 1277 },
+  { x: 950, y: 1277 },
+  { x: 1030, y: 1277 },
+  { x: 1110, y: 1277 },
+];
 
 // Possible fish spawn spots for Level 2 (picked randomly each attempt).
 // Walk the penguin to a spot, read "Player: x, y" in the corner of the
@@ -13,8 +28,12 @@
 const LEVEL2_FISH_SPAWNS = [
     { x: 942, y: 859},
     { x: 601, y: 646},
-    { x: 57, y: 1210},
+    { x: 87, y: 1180},
 ];
+
+function preloadLevel2Assets() {
+  hole = loadImage("assets/images/crevice.png");
+}
 
 // Where the fish first appears when Level 2 loads.
 function getLevel2FishStart(WORLD_W_SCALED, WORLD_H_SCALED) {
@@ -65,83 +84,61 @@ function buildLevel2Walls(WORLD_W_SCALED, WORLD_H_SCALED) {
         y2: 530
     }
     ];
- /*
-    return [
-    {
-      x1: 5,
-      y1: 1500,
-      x2: WORLD_W_SCALED / 2 + 250,
-      y2: WORLD_H_SCALED / 2 - 1500
-    },
-    {
-      x1: WORLD_W_SCALED / 2 + 650,
-      y1: WORLD_H_SCALED / 2 + 1200,
-      x2: WORLD_W_SCALED / 2 - 200,
-      y2: WORLD_H_SCALED / 2 - 1500
-    }
-  ];
-  */
 }
 
 // Spike placements for Level 2. variant: 0 = small, 1 = mid,
 // 2 = tall, 3 = double.
 const LEVEL2_SPIKES = [
   { x: 494, y: 1381, variant: 0 },
-  { x: 619, y: 572, variant: 1 },
-  { x: 565, y: 602, variant: 1 },
-  { x: 517, y: 614, variant: 1 },
-  { x: 519, y: 662, variant: 2 },
-  { x: 551, y: 690, variant: 2 },
-  { x: 588, y: 710, variant: 2 },
-  { x: 633, y: 724, variant: 3 },
-  { x: 683, y: 728, variant: 3 },
-  { x: 729, y: 730, variant: 3 },
-  { x: 738, y: 606, variant: 0 },
-  { x: 466, y: 700, variant: 0 },
-  { x: 503, y: 716, variant: 0 },
-  { x: 340, y: 624, variant: 2 },
-  { x: 533, y: 991, variant: 3 },
-  { x: 525, y: 841, variant: 0 },
-  { x: 711, y: 875, variant: 0 },
-  { x: 240, y: 1053, variant: 1 },
-  { x: 276, y: 1088, variant: 1 },
-  { x: 303, y: 1126, variant: 1 },
-  { x: 31, y: 1294, variant: 1 },
-  { x: 70, y: 1300, variant: 1 },
-  { x: 106, y: 1300, variant: 1 },
-  { x: 142, y: 1300, variant: 1 },
-  { x: 180, y: 1290, variant: 1 },
-  { x: 232, y: 1278, variant: 1 },
-  { x: 1049, y: 1144, variant: 1 },
-  { x: 1016, y: 1162, variant: 1 },
-  { x: 991, y: 1188, variant: 1 },
-  { x: 949, y: 1208, variant: 1 },
-  { x: 894, y: 1226, variant: 3 },
-  { x: 850, y: 1238, variant: 3 },
-  { x: 805, y: 1252, variant: 3 },
-  { x: 911, y: 795, variant: 2 },
-  { x: 876, y: 839, variant: 2 },
-  { x: 851, y: 871, variant: 2 },
-  { x: 817, y: 923, variant: 2 },
-  { x: 794, y: 959, variant: 2 },
-  { x: 768, y: 995, variant: 2 },
-  { x: 739, y: 1037, variant: 2 },
-  { x: 720, y: 1082, variant: 1 },
-  { x: 698, y: 1128, variant: 1 },
-  { x: 656, y: 1134, variant: 1 },
-  { x: 604, y: 1146, variant: 1 },
-  { x: 454, y: 1156, variant: 3 },
-  { x: 357, y: 1252, variant: 3 },
-  { x: 704, y: 1360, variant: 3 },
-  { x: 922, y: 991, variant: 1 },
-  { x: 254, y: 746, variant: 1 },
-  { x: 285, y: 789, variant: 1 },
-  { x: 320, y: 827, variant: 1 },
-  { x: 350, y: 871, variant: 1 },
-  { x: 375, y: 923, variant: 1 },
-  { x: 409, y: 965, variant: 1 },
-  { x: 447, y: 1001, variant: 1 },
-  { x: 489, y: 1015, variant: 1 },
+ { x: 619, y: 572, variant: 1 },
+ { x: 565, y: 602, variant: 1 },
+ { x: 517, y: 614, variant: 1 },
+ { x: 519, y: 662, variant: 2 },
+ { x: 551, y: 690, variant: 2 },
+ { x: 588, y: 710, variant: 2 },
+ { x: 633, y: 724, variant: 3 },
+ { x: 683, y: 728, variant: 3 },
+ { x: 729, y: 730, variant: 3 },
+ { x: 738, y: 606, variant: 0 },
+ { x: 466, y: 700, variant: 0 },
+ { x: 503, y: 716, variant: 0 },
+ { x: 340, y: 624, variant: 2 },
+ { x: 533, y: 991, variant: 3 },
+ { x: 525, y: 841, variant: 0 },
+ { x: 711, y: 875, variant: 0 },
+ { x: 240, y: 1053, variant: 1 },
+ { x: 276, y: 1088, variant: 1 },
+ { x: 303, y: 1126, variant: 1 },
+ { x: 31, y: 1294, variant: 1 },
+ { x: 70, y: 1300, variant: 1 },
+ { x: 106, y: 1300, variant: 1 },
+ { x: 142, y: 1300, variant: 1 },
+ { x: 1049, y: 1144, variant: 1 },
+ { x: 1016, y: 1162, variant: 1 },
+ { x: 991, y: 1188, variant: 1 },
+ { x: 949, y: 1208, variant: 1 },
+ { x: 911, y: 795, variant: 2 },
+ { x: 876, y: 839, variant: 2 },
+ { x: 851, y: 871, variant: 2 },
+ { x: 817, y: 923, variant: 2 },
+ { x: 794, y: 959, variant: 2 },
+ { x: 768, y: 995, variant: 2 },
+ { x: 739, y: 1037, variant: 2 },
+ { x: 720, y: 1082, variant: 1 },
+ { x: 698, y: 1128, variant: 1 },
+ { x: 656, y: 1134, variant: 1 },
+ { x: 604, y: 1146, variant: 1 },
+ { x: 454, y: 1156, variant: 3 },
+ { x: 704, y: 1360, variant: 3 },
+ { x: 922, y: 991, variant: 1 },
+ { x: 254, y: 746, variant: 1 },
+ { x: 285, y: 789, variant: 1 },
+ { x: 320, y: 827, variant: 1 },
+ { x: 350, y: 871, variant: 1 },
+ { x: 375, y: 923, variant: 1 },
+ { x: 409, y: 965, variant: 1 },
+ { x: 447, y: 1001, variant: 1 },
+ { x: 489, y: 1015, variant: 1 },
 ];
 
 // How far above center the top boundary/camera limit sits for this
@@ -150,4 +147,27 @@ const LEVEL2_SPIKES = [
 const LEVEL2_TOP_OFFSET = 550;
 
 // World Y coordinate of the finish line for Level 2.
-const LEVEL2_FINISH_Y = 593; // <- replace with your recorded value
+const LEVEL2_FINISH_Y = 600;
+
+function drawLevel2Holes(scale = 1) {
+  // Get the base image size
+  const baseW = hole.width;
+  const baseH = hole.height;
+
+  const drawW = baseW * scale;
+  const drawH = baseH * scale;
+
+  for (let i = 0; i < LEVEL2_HOLES.length; i++) {
+    const h = LEVEL2_HOLES[i];
+
+    // Center the hole on its x,y
+    image(
+      hole,
+      h.x - drawW / 2,
+      h.y - drawH / 2,
+      drawW,
+      drawH
+    );
+  }
+}
+
