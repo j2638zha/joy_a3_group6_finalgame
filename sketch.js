@@ -1,6 +1,6 @@
 //sketch.js file
 // Screen manager
-let gameState = "start"; 
+let gameState = "start";
 let startBg;
 let winBg;
 let lossBg;
@@ -11,8 +11,12 @@ let level3Bg;
 let transitionPage;
 let levelPickerBg;
 
+// AUDIO
+let introMusic;
+let audioUnlocked = false;
+
 let transitionStartTime = 0;
-const TRANSITION_DURATION = 3000; 
+const TRANSITION_DURATION = 3000;
 
 // Buttons states:
 let startBtnPressed = false;
@@ -21,8 +25,8 @@ let lossBtnPressed = false;
 let levelPickerBtnPressed = false;
 
 // Background stuff
-const VIEW_W  = 1200;
-const VIEW_H  = 780;
+const VIEW_W = 1200;
+const VIEW_H = 780;
 let WORLD_W;
 let WORLD_H;
 let WORLD_W_SCALED;
@@ -51,7 +55,7 @@ let holes = [];
 // ---------------- HOLE FALL / CLIMB SYSTEM ----------------
 // States: "none" (normal play) -> "falling" -> "shaking" -> "climbing" -> "none"
 let holeState = "none";
-let activeHole = null;   // the hole object the player is currently inside
+let activeHole = null; // the hole object the player is currently inside
 
 let holeFallFrame = 0;
 let holeFallFrameTimer = 0;
@@ -63,10 +67,10 @@ let holeShakeStartTime = 0;
 const HOLE_SHAKE_DURATION = 1500; // 3 seconds of screen shake
 let holeShakeOffsetX = 0;
 let holeShakeOffsetY = 0;
-const HOLE_SHAKE_MAGNITUDE = 8;   // pixels of shake, tweak for intensity
+const HOLE_SHAKE_MAGNITUDE = 8; // pixels of shake, tweak for intensity
 
-const HOLE_IMMUNITY_MS = 5000;       // can't fall into the same hole again for 5s after climbing out
-const HOLE_TIME_PENALTY = 20;        // seconds docked from the timer on falling in
+const HOLE_IMMUNITY_MS = 5000; // can't fall into the same hole again for 5s after climbing out
+const HOLE_TIME_PENALTY = 20; // seconds docked from the timer on falling in
 const HOLE_TIMER_FLASH_FRAMES = 240; // 4 seconds @ 60fps red/white flash on the timer
 
 // ---- SIZE TUNING ----
@@ -93,10 +97,10 @@ const SPRITES = {
     offsetX: 0,
     offsetY: 0,
 
-    cropLeft:  [65, 25, 0, 0, 0, 0],
+    cropLeft: [65, 25, 0, 0, 0, 0],
     cropRight: [0, 0, 20, 60, 90, 120],
-    cropTop:   [0, 0, 0, 0, 0, 60],
-    cropBottom:[180, 180, 180, 180, 180, 180]
+    cropTop: [0, 0, 0, 0, 0, 60],
+    cropBottom: [180, 180, 180, 180, 180, 180],
   },
 
   left: {
@@ -109,10 +113,10 @@ const SPRITES = {
     offsetX: -2,
     offsetY: 0,
 
-    cropLeft:  [25, 35, 45, 55, 65, 75],
+    cropLeft: [25, 35, 45, 55, 65, 75],
     cropRight: [0, 0, 0, 0, 0, 0],
-    cropTop:   [0, 0, 0, 0, 0, 0],
-    cropBottom:[0, 0, 0, 0, 0, 0]
+    cropTop: [0, 0, 0, 0, 0, 0],
+    cropBottom: [0, 0, 0, 0, 0, 0],
   },
 
   right: {
@@ -125,10 +129,10 @@ const SPRITES = {
     offsetX: -2,
     offsetY: 0,
 
-    cropLeft:  [0, 8, 8, 8, 30, 30],
+    cropLeft: [0, 8, 8, 8, 30, 30],
     cropRight: [0, 0, 0, 0, 0, 0],
-    cropTop:   [0, 0, 0, 0, 0, 0],
-    cropBottom:[0, 0, 0, 0, 0, 0],
+    cropTop: [0, 0, 0, 0, 0, 0],
+    cropBottom: [0, 0, 0, 0, 0, 0],
   },
 
   down: {
@@ -142,10 +146,10 @@ const SPRITES = {
     offsetY: 0,
     flashlightLength: 190,
 
-    cropLeft:  [130, 85, 25, 0, 0, 0],
+    cropLeft: [130, 85, 25, 0, 0, 0],
     cropRight: [0, 0, 0, 25, 65, 85],
-    cropTop:   [0, 0, 0, 0, 0, 0],
-    cropBottom:[0, 0, 0, 0, 0, 0]
+    cropTop: [0, 0, 0, 0, 0, 0],
+    cropBottom: [0, 0, 0, 0, 0, 0],
   },
 
   wd: {
@@ -158,10 +162,10 @@ const SPRITES = {
     offsetX: 0,
     offsetY: 0,
 
-    cropLeft:   [0, 0, 20, 30],
-    cropRight:  [0, 0, 0, 0],
-    cropTop:    [0, 0, 0, 0],
-    cropBottom: [0, 0, 0, 0]
+    cropLeft: [0, 0, 20, 30],
+    cropRight: [0, 0, 0, 0],
+    cropTop: [0, 0, 0, 0],
+    cropBottom: [0, 0, 0, 0],
   },
 
   aw: {
@@ -174,10 +178,10 @@ const SPRITES = {
     offsetX: 0,
     offsetY: 0,
 
-    cropLeft:   [0, 0, 20, 50],
-    cropRight:  [0, 0, 0, 0],
-    cropTop:    [0, 0, 0, 0],
-    cropBottom: [0, 0, 0, 0]
+    cropLeft: [0, 0, 20, 50],
+    cropRight: [0, 0, 0, 0],
+    cropTop: [0, 0, 0, 0],
+    cropBottom: [0, 0, 0, 0],
   },
 
   sd: {
@@ -190,10 +194,10 @@ const SPRITES = {
     offsetX: 0,
     offsetY: 0,
 
-    cropLeft:   [0, 0, 40, 90],
-    cropRight:  [0, 0, 0, 0],
-    cropTop:    [0, 0, 0, 0],
-    cropBottom: [0, 0, 0, 0]
+    cropLeft: [0, 0, 40, 90],
+    cropRight: [0, 0, 0, 0],
+    cropTop: [0, 0, 0, 0],
+    cropBottom: [0, 0, 0, 0],
   },
 
   as: {
@@ -206,10 +210,10 @@ const SPRITES = {
     offsetX: 0,
     offsetY: 0,
 
-    cropLeft:   [0, 0, 40, 90],
-    cropRight:  [0, 0, 0, 0],
-    cropTop:    [0, 0, 0, 0],
-    cropBottom: [0, 0, 0, 0]
+    cropLeft: [0, 0, 40, 90],
+    cropRight: [0, 0, 0, 0],
+    cropTop: [0, 0, 0, 0],
+    cropBottom: [0, 0, 0, 0],
   },
 
   stomp: {
@@ -220,25 +224,25 @@ const SPRITES = {
     animSpeed: 10,
     scale: 1,
 
-    cropLeft:   [0,0,0,0,0,0],
-    cropRight:  [0,0,0,0,0,0],
-    cropTop:    [0,0,0,0,0,0],
-    cropBottom: [0,0,0,0,0,0]
+    cropLeft: [0, 0, 0, 0, 0, 0],
+    cropRight: [0, 0, 0, 0, 0, 0],
+    cropTop: [0, 0, 0, 0, 0, 0],
+    cropBottom: [0, 0, 0, 0, 0, 0],
   },
 
   goat: {
-  img: null,
-  frameWidth: 248,   // 247–248 is correct
-  frameHeight: 248,  // 247–248 is correct
-  numFrames: 5,      // 5 columns
-  animSpeed: 20,
-  scale: 0.3,
+    img: null,
+    frameWidth: 248, // 247–248 is correct
+    frameHeight: 248, // 247–248 is correct
+    numFrames: 5, // 5 columns
+    animSpeed: 20,
+    scale: 0.3,
 
-  cropLeft:   [10, 15, 20, 15, 10],
-  cropRight:  [10, 15, 20, 15, 10],
-  cropTop:    [0, 0, 0, 0, 0],
-  cropBottom: [0, 0, 0, 0, 0]
-},
+    cropLeft: [10, 15, 20, 15, 10],
+    cropRight: [10, 15, 20, 15, 10],
+    cropTop: [0, 0, 0, 0, 0],
+    cropBottom: [0, 0, 0, 0, 0],
+  },
 
   // ---- HOLE FALL / CLIMB ANIMATIONS (from the standalone climb/fall file) ----
   climb: {
@@ -250,10 +254,10 @@ const SPRITES = {
     scale: 0.4,
     offsetX: 4.8,
     offsetY: -42,
-    cropLeft:   [0, 9, 20, 30, 40, 50],
-    cropRight:  [0, 0, 0, 0, 0, 0],
-    cropTop:    [0, 0, 0, 32, 0, 0],
-    cropBottom: [0, 0, 0, 0, 0, 0]
+    cropLeft: [0, 9, 20, 30, 40, 50],
+    cropRight: [0, 0, 0, 0, 0, 0],
+    cropTop: [0, 0, 0, 32, 0, 0],
+    cropBottom: [0, 0, 0, 0, 0, 0],
   },
 
   fall: {
@@ -265,10 +269,10 @@ const SPRITES = {
     scale: 0.4,
     offsetX: 4.8,
     offsetY: -33,
-    cropLeft:   [0, 10, 20, 30, 40, 50],
-    cropRight:  [0, 0, 0, 0, 0, 0],
-    cropTop:    [0, 0, 0, 32, 0, 0],
-    cropBottom: [0, 0, 0, 0, 0, 0]
+    cropLeft: [0, 10, 20, 30, 40, 50],
+    cropRight: [0, 0, 0, 0, 0, 0],
+    cropTop: [0, 0, 0, 32, 0, 0],
+    cropBottom: [0, 0, 0, 0, 0, 0],
   },
 
   enterButton: {
@@ -281,11 +285,11 @@ const SPRITES = {
     offsetX: 4,
     offsetY: -150,
 
-    cropLeft:   [0, 8, 13, 23, 26, 32],
-    cropRight:  [0, 0, 0, 0, 0, 0],
-    cropTop:    [0, 0, 0, 0, 0, 0],
-    cropBottom: [0, 0, 0, 0, 0, 0]
-  }
+    cropLeft: [0, 8, 13, 23, 26, 32],
+    cropRight: [0, 0, 0, 0, 0, 0],
+    cropTop: [0, 0, 0, 0, 0, 0],
+    cropBottom: [0, 0, 0, 0, 0, 0],
+  },
 };
 
 let player = {
@@ -305,22 +309,22 @@ let totalTime = 10;
 const LEVEL_TIMES = {
   1: 210,
   2: 180,
-  3: 150 
+  3: 150,
 };
 let startTime;
 let timerStarted = false;
-let gameEnded = false;  
+let gameEnded = false;
 let finalTime = null;
 let flashTimer = 0;
 let fastestTimes = {
-    level1: null,
-    level2: null,
-    level3: null
+  level1: null,
+  level2: null,
+  level3: null,
 };
 let fastestTimesIsNew = {
-    level1: false,
-    level2: false,
-    level3: false
+  level1: false,
+  level2: false,
+  level3: false,
 };
 
 // World-space Y where the penguin should spawn. This matches the
@@ -341,13 +345,20 @@ function playerSpawnY() {
 // the player enters a level.
 function loadLevel(levelNum) {
   let img, topOffset;
-  if (levelNum === 1) { img = level1Bg; topOffset = LEVEL1_TOP_OFFSET; }
-  else if (levelNum === 2) { img = level2Bg; topOffset = LEVEL2_TOP_OFFSET; }
-  else if (levelNum === 3) { img = level3Bg; topOffset = LEVEL3_TOP_OFFSET; }
+  if (levelNum === 1) {
+    img = level1Bg;
+    topOffset = LEVEL1_TOP_OFFSET;
+  } else if (levelNum === 2) {
+    img = level2Bg;
+    topOffset = LEVEL2_TOP_OFFSET;
+  } else if (levelNum === 3) {
+    img = level3Bg;
+    topOffset = LEVEL3_TOP_OFFSET;
+  }
   if (levelNum === 3) {
     goatX = WORLD_W_SCALED / 2 - 200;
     goatY = WORLD_H_SCALED / 2 + 200;
-}
+  }
   bgImg = img;
   WORLD_W = img.width;
   WORLD_H = img.height;
@@ -364,28 +375,38 @@ function loadLevel(levelNum) {
 
   // Fish
   let fishStart;
-  if (levelNum === 1) { fishStart = getLevel1FishStart(WORLD_W_SCALED, WORLD_H_SCALED); fishSpawns = LEVEL1_FISH_SPAWNS; }
-  else if (levelNum === 2) { fishStart = getLevel2FishStart(WORLD_W_SCALED, WORLD_H_SCALED); fishSpawns = LEVEL2_FISH_SPAWNS; }
-  else if (levelNum === 3) { fishStart = getLevel3FishStart(WORLD_W_SCALED, WORLD_H_SCALED); fishSpawns = LEVEL3_FISH_SPAWNS; }
+  if (levelNum === 1) {
+    fishStart = getLevel1FishStart(WORLD_W_SCALED, WORLD_H_SCALED);
+    fishSpawns = LEVEL1_FISH_SPAWNS;
+  } else if (levelNum === 2) {
+    fishStart = getLevel2FishStart(WORLD_W_SCALED, WORLD_H_SCALED);
+    fishSpawns = LEVEL2_FISH_SPAWNS;
+  } else if (levelNum === 3) {
+    fishStart = getLevel3FishStart(WORLD_W_SCALED, WORLD_H_SCALED);
+    fishSpawns = LEVEL3_FISH_SPAWNS;
+  }
   fish.x = fishStart.x;
   fish.y = fishStart.y;
   fish.collected = false;
 
   // Walls (clear old level's walls first, then rebuild)
   walls.length = 0;
-  if (levelNum === 1) walls.push(...buildLevel1Walls(WORLD_W_SCALED, WORLD_H_SCALED));
-  else if (levelNum === 2) walls.push(...buildLevel2Walls(WORLD_W_SCALED, WORLD_H_SCALED));
-  else if (levelNum === 3) walls.push(...buildLevel3Walls(WORLD_W_SCALED, WORLD_H_SCALED));
+  if (levelNum === 1)
+    walls.push(...buildLevel1Walls(WORLD_W_SCALED, WORLD_H_SCALED));
+  else if (levelNum === 2)
+    walls.push(...buildLevel2Walls(WORLD_W_SCALED, WORLD_H_SCALED));
+  else if (levelNum === 3)
+    walls.push(...buildLevel3Walls(WORLD_W_SCALED, WORLD_H_SCALED));
 
   // Spikes
-  if (levelNum === 1) spikes = LEVEL1_SPIKES.map(s => ({ ...s }));
-  else if (levelNum === 2) spikes = LEVEL2_SPIKES.map(s => ({ ...s }));
-  else if (levelNum === 3) spikes = LEVEL3_SPIKES.map(s => ({ ...s }));
+  if (levelNum === 1) spikes = LEVEL1_SPIKES.map((s) => ({ ...s }));
+  else if (levelNum === 2) spikes = LEVEL2_SPIKES.map((s) => ({ ...s }));
+  else if (levelNum === 3) spikes = LEVEL3_SPIKES.map((s) => ({ ...s }));
 
   // Crevices
   if (levelNum === 1) holes = [];
-  else if (levelNum === 2) holes = LEVEL2_HOLES.map(h => ({ ...h }));
-  else if (levelNum === 3) holes = LEVEL3_HOLES.map(h => ({ ...h }));
+  else if (levelNum === 2) holes = LEVEL2_HOLES.map((h) => ({ ...h }));
+  else if (levelNum === 3) holes = LEVEL3_HOLES.map((h) => ({ ...h }));
 
   // Reset the hole sequence whenever a level (re)loads
   holeState = "none";
@@ -404,7 +425,7 @@ const PENGUIN_HITBOX = {
   w: 30,
   h: 40,
   offsetX: -15,
-  offsetY: -35   // because the sprite is now anchored at the feet
+  offsetY: -35, // because the sprite is now anchored at the feet
 };
 
 let DEBUG_PENGUIN_HITBOX = false; // remove after debugging
@@ -417,7 +438,7 @@ let flashlight = {
   baseWidth: 200, // width of flashlight near penguin
   endWidth: 330, // max width
   length: 220,
-  opacity: 180,     // white glow strength
+  opacity: 180, // white glow strength
   glowOpacity: 255, // outer white ring
 };
 
@@ -429,7 +450,7 @@ const STOMP_FRAME_DURATIONS = [10, 10, 10, 10, 70, 10];
 const STOMP_NUM_FRAMES = 6;
 let waveActive = false;
 let waveRadius = 200;
-let waveMaxRadius = 630; 
+let waveMaxRadius = 630;
 let waveGrowth = 25;
 let waveDelay = 0;
 let waveDelayActive = false;
@@ -447,10 +468,10 @@ let stompOffsetY = 0;
 const SPIKE_DRAW_W = 60;
 const SPIKE_DRAW_H = 60;
 const SPIKE_HITBOXES = [
-  { w: 30, h: 40, offsetX: 14, offsetY: 15 },  // small spike
-  { w: 45, h: 40, offsetX: 8, offsetY: 15 },  // mid spike
-  { w: 48, h: 40, offsetX: 7, offsetY: 17 },  // tall spike
-  { w: 45, h: 40, offsetX: 5, offsetY: 15 }   // double spike
+  { w: 30, h: 40, offsetX: 14, offsetY: 15 }, // small spike
+  { w: 45, h: 40, offsetX: 8, offsetY: 15 }, // mid spike
+  { w: 48, h: 40, offsetX: 7, offsetY: 17 }, // tall spike
+  { w: 45, h: 40, offsetX: 5, offsetY: 15 }, // double spike
 ];
 let spikeImages = [];
 let spikes = [];
@@ -467,16 +488,16 @@ let fish = {
   y: 0,
   w: 35,
   h: 25,
-  collected: false
+  collected: false,
 };
-let fishIconOutline;   // when NOT collected
-let fishIconFilled;    // when collected
+let fishIconOutline; // when NOT collected
+let fishIconFilled; // when collected
 let needFishMessageActive = false;
 let needFishMessageTimer = 0;
 let needFishMessageDuration = 180; // 3 seconds at 60fps
 let foundFishMessageActive = false;
 let foundFishMessageTimer = 0;
-let foundFishMessageDuration = 240
+let foundFishMessageDuration = 240;
 
 // Per-level fish spawn points. Set to LEVEL1_FISH_SPAWNS /
 // LEVEL2_FISH_SPAWNS / etc when a level is loaded — see
@@ -494,11 +515,12 @@ let fishAnimationSpeed = 10;
 // Stars score
 let starOutlineImg;
 let starFilledImg;
-let starsEarned = 0; 
-let bestStars = { //highest score tracker
+let starsEarned = 0;
+let bestStars = {
+  //highest score tracker
   level1: 0,
   level2: 0,
-  level3: 0
+  level3: 0,
 };
 
 function preload() {
@@ -513,9 +535,10 @@ function preload() {
   SPRITES.sd.img = loadImage("assets/images/sd_key_penguin.png");
   SPRITES.as.img = loadImage("assets/images/as_key_penguin.png");
   startBg = loadImage("assets/images/title_screen.png");
-  winBg   = loadImage("assets/images/win_screen.png");
-  lossBg  = loadImage("assets/images/loss_screen.png");
+  winBg = loadImage("assets/images/win_screen.png");
+  lossBg = loadImage("assets/images/loss_screen.png");
   transitionPage = loadImage("assets/images/transition_page.png");
+  introMusic = loadSound("assets/sounds/introscreen.mp3");
 
   // Tutorial card assets (tutorial_cards.js)
   preloadTutorialAssets();
@@ -525,12 +548,12 @@ function preload() {
   // Fishy stuff
   fishImg = loadImage("assets/images/test_fish.png");
   fishSheet = loadImage("assets/images/fish.png");
-  fishIconOutline = loadImage("assets/images/fish_outline.png"); 
-  fishIconFilled  = loadImage("assets/images/fish_item.png");
+  fishIconOutline = loadImage("assets/images/fish_outline.png");
+  fishIconFilled = loadImage("assets/images/fish_item.png");
 
   // Star score
   starOutlineImg = loadImage("assets/images/star_outline.png");
-  starFilledImg  = loadImage("assets/images/golden_star.png");
+  starFilledImg = loadImage("assets/images/golden_star.png");
 
   spikeImages[0] = loadImage("assets/images/spike_small.png");
   spikeImages[1] = loadImage("assets/images/spike_mid.png");
@@ -541,7 +564,7 @@ function preload() {
   level2Bg = loadImage("assets/images/level2_background.png");
   level3Bg = loadImage("assets/images/level3_background.png");
 
- SPRITES.goat.img = loadImage("assets/images/goat_spritesheet.png");
+  SPRITES.goat.img = loadImage("assets/images/goat_spritesheet.png");
 
   // Hole fall/climb animation sheets + enter button (from the standalone file)
   SPRITES.climb.img = loadImage("assets/images/penguin_climb.png");
@@ -557,7 +580,7 @@ function setup() {
   pixelDensity(1);
   imageMode(CORNER);
   startTime = millis();
-  blueBuffer  = createGraphics(VIEW_W, VIEW_H);
+  blueBuffer = createGraphics(VIEW_W, VIEW_H);
   ringMaskBuffer = createGraphics(VIEW_W, VIEW_H);
   // Created ONCE and reused every frame in drawBlizzardOverlay(). The old
   // code called createGraphics() inside draw() every frame, which allocated
@@ -606,12 +629,7 @@ function drawSpikeHitboxes() {
     // RED = actual collision hitbox
     stroke(255, 0, 0);
     strokeWeight(3 / (camZoom * bgScale));
-    rect(
-      s.x + hb.offsetX,
-      s.y + hb.offsetY,
-      hb.w,
-      hb.h
-    );
+    rect(s.x + hb.offsetX, s.y + hb.offsetY, hb.w, hb.h);
   }
   pop();
 }
@@ -633,36 +651,46 @@ function drawPenguinHitbox() {
   noFill();
   stroke(0, 255, 0);
   strokeWeight(3);
-  rect(
-    screenX,
-    screenY,
-    hw * scale,
-    hh * scale
-  );
+  rect(screenX, screenY, hw * scale, hh * scale);
   pop();
 }
 
 function drawButton(label, x, y, w, h, pressedFlag) {
   let offsetY = pressedFlag ? 4 : 0;
-  let hover = mouseX > x - w/2 && mouseX < x + w/2 &&
-              mouseY > y - h/2 + offsetY && mouseY < y + h/2 + offsetY;
+  let hover =
+    mouseX > x - w / 2 &&
+    mouseX < x + w / 2 &&
+    mouseY > y - h / 2 + offsetY &&
+    mouseY < y + h / 2 + offsetY;
   let pulse = sin(frameCount * 0.07) * (hover ? 0 : 3);
 
   // shadow
   noStroke();
   fill(10, 20, 60, 130);
-  rect(floor(x-w/2+5), floor(y-h/2+5+offsetY), w, h, 8);
+  rect(floor(x - w / 2 + 5), floor(y - h / 2 + 5 + offsetY), w, h, 8);
 
   // body
   fill(hover ? 60 : 42, hover ? 90 : 68, hover ? 175 : 150, 230);
   stroke(130, 170, 230, 200);
   strokeWeight(3);
-  rect(floor(x-w/2+pulse/2), floor(y-h/2+offsetY+pulse/2), w-pulse, h-pulse, 8);
+  rect(
+    floor(x - w / 2 + pulse / 2),
+    floor(y - h / 2 + offsetY + pulse / 2),
+    w - pulse,
+    h - pulse,
+    8,
+  );
   noStroke();
 
   // shine
   fill(255, 255, 255, 50);
-  rect(floor(x-w/2+pulse/2+4), floor(y-h/2+offsetY+pulse/2+4), w-pulse-8, 10, 4);
+  rect(
+    floor(x - w / 2 + pulse / 2 + 4),
+    floor(y - h / 2 + offsetY + pulse / 2 + 4),
+    w - pulse - 8,
+    10,
+    4,
+  );
 
   // label
   textFont(gameFont);
@@ -670,13 +698,18 @@ function drawButton(label, x, y, w, h, pressedFlag) {
   textAlign(CENTER, CENTER);
   textStyle(BOLD);
 
-  for (let [ox,oy] of [[-2,-2],[2,-2],[-2,2],[2,2]]) {
+  for (let [ox, oy] of [
+    [-2, -2],
+    [2, -2],
+    [-2, 2],
+    [2, 2],
+  ]) {
     fill(10, 20, 70, 200);
-    text(label, floor(x+ox), floor(y+offsetY+oy-5));
+    text(label, floor(x + ox), floor(y + offsetY + oy - 5));
   }
 
   fill(210, 230, 255);
-  text(label, floor(x), floor(y+offsetY-5));
+  text(label, floor(x), floor(y + offsetY - 5));
   return hover;
 }
 
@@ -685,8 +718,7 @@ function drawFish() {
 
   // Animate fish
   if (frameCount % fishAnimationSpeed === 0) {
-    currentFishFrame =
-      (currentFishFrame + 1) % fishTotalFrames;
+    currentFishFrame = (currentFishFrame + 1) % fishTotalFrames;
   }
 
   let sx = currentFishFrame * fishFrameWidth;
@@ -701,15 +733,15 @@ function drawFish() {
     sx,
     sy,
     fishFrameWidth,
-    fishFrameHeight
+    fishFrameHeight,
   );
 }
 
 function drawFishIconUI() {
-  let x = 40;   // screen position
+  let x = 40; // screen position
   let y = 40;
-  let iconW = 80;   // width
-  let iconH = 50;   // height
+  let iconW = 80; // width
+  let iconH = 50; // height
 
   if (fish.collected) {
     image(fishIconFilled, x, y, iconW, iconH);
@@ -737,13 +769,7 @@ function drawFishCompass() {
   const iconX = cx + cos(angle) * radius;
   const iconY = cy + sin(angle) * radius;
 
-  let fade = map(
-    waveRadius,
-    waveMaxRadius * 0.7,
-    waveMaxRadius,
-    255,
-    0
-  );
+  let fade = map(waveRadius, waveMaxRadius * 0.7, waveMaxRadius, 255, 0);
 
   fade = constrain(fade, 0, 255);
   push();
@@ -757,7 +783,7 @@ function drawFishCompass() {
 }
 
 function randomizeFishPosition() {
-  let spot = random(fishSpawns);   // p5.js random() picks a random element
+  let spot = random(fishSpawns); // p5.js random() picks a random element
   fish.x = spot.x;
   fish.y = spot.y;
 }
@@ -770,13 +796,7 @@ function drawHoles(scale = 1) {
   const drawH = baseH * scale;
 
   for (const h of holes) {
-    image(
-      hole,
-      h.x - drawW / 2,
-      h.y - drawH / 2,
-      drawW,
-      drawH
-    );
+    image(hole, h.x - drawW / 2, h.y - drawH / 2, drawW, drawH);
   }
 }
 
@@ -786,8 +806,11 @@ function drawStartScreen() {
   imageMode(CORNER);
   image(startBg, 0, 0, width, height);
 
-  let hover = mouseX > START_BTN.x && mouseX < START_BTN.x + START_BTN.w &&
-              mouseY > START_BTN.y && mouseY < START_BTN.y + START_BTN.h;
+  let hover =
+    mouseX > START_BTN.x &&
+    mouseX < START_BTN.x + START_BTN.w &&
+    mouseY > START_BTN.y &&
+    mouseY < START_BTN.y + START_BTN.h;
 
   if (hover) {
     cursor(HAND);
@@ -880,8 +903,24 @@ function drawTransitionScreen() {
   }
 }
 
+// audio
+
+function updateStartMusic() {
+  if (!introMusic || !introMusic.isLoaded()) return;
+  if (!audioUnlocked) return; // browsers block audio before a click/keypress
+
+  if (gameState === "start") {
+    if (!introMusic.isPlaying()) {
+      introMusic.setVolume(0.5);
+      introMusic.loop();
+    }
+  } else if (introMusic.isPlaying()) {
+    introMusic.stop(); // or .pause() if you want it to resume where it left off
+  }
+}
 function draw() {
   // START SCREEN
+  updateStartMusic();
   if (gameState === "start") {
     drawStartScreen();
     return;
@@ -900,17 +939,16 @@ function draw() {
   }
 
   // WIN → LEVEL PICKER TRANSITION
-if (gameState === "transition") {
-  drawTransitionScreen();
-  return;
-}
+  if (gameState === "transition") {
+    drawTransitionScreen();
+    return;
+  }
 
   // LEVEL PICKER
   if (gameState === "level_picker") {
     drawLevelPickerScreen();
     return;
   }
-
 
   // -------------------------
   // GAMEPLAY
@@ -934,9 +972,9 @@ if (gameState === "transition") {
 
   // ---------------- GOAT INIT (only for Level 3) ----------------
   if (currentLevel === 3 && !goatInitialized) {
-      goatInitialized = true;
-      goatStartTime = millis();
-      goatDirection = random(["left", "right"]);
+    goatInitialized = true;
+    goatStartTime = millis();
+    goatDirection = random(["left", "right"]);
   }
 
   // While the penguin is falling/shaking/climbing in a hole, skip the
@@ -973,10 +1011,10 @@ if (gameState === "transition") {
       // --- UPDATE FASTEST TIME ---
       let key = "level" + currentLevel;
       if (fastestTimes[key] === null || finalTime < fastestTimes[key]) {
-          fastestTimes[key] = finalTime;
-          fastestTimesIsNew[key] = true;
+        fastestTimes[key] = finalTime;
+        fastestTimesIsNew[key] = true;
       } else {
-          fastestTimesIsNew[key] = false;
+        fastestTimesIsNew[key] = false;
       }
 
       tutorialActive = false;
@@ -1009,7 +1047,7 @@ if (gameState === "transition") {
     // so it reads as a consistent shake regardless of camera zoom
     translate(
       holeShakeOffsetX / (camZoom * bgScale),
-      holeShakeOffsetY / (camZoom * bgScale)
+      holeShakeOffsetY / (camZoom * bgScale),
     );
   }
   drawBackground();
@@ -1022,7 +1060,7 @@ if (gameState === "transition") {
 
   // ---------------- GOAT UPDATE ----------------
   if (currentLevel === 3) {
-      updateLevel3Goat();
+    updateLevel3Goat();
   }
 
   // ---------------- HOLE FALL / SHAKE / CLIMB SEQUENCE ----------------
@@ -1118,24 +1156,18 @@ if (gameState === "transition") {
 
   // TUTORIAL OVERLAY (tutorial_cards.js)
   if (tutorialActive) {
-      drawTutorialOverlay();
+    drawTutorialOverlay();
   }
 
   // --- NEED FISH POPUP MESSAGE ---
- if (needFishMessageActive) {
+  if (needFishMessageActive) {
     needFishMessageTimer--;
     push();
     imageMode(CENTER);
     const cardW = min(730, width - 160);
     const cardH = cardW * (popUpCard.height / popUpCard.width);
     const cardY = 180; // moves the popup closer to the timer
-    image(
-      popUpCard,
-      width / 2,
-      cardY,
-      cardW,
-      cardH
-    );
+    image(popUpCard, width / 2, cardY, cardW, cardH);
     pop();
     if (needFishMessageTimer <= 0) {
       needFishMessageActive = false;
@@ -1146,17 +1178,15 @@ if (gameState === "transition") {
     foundFishMessageTimer--;
     push();
     imageMode(CENTER);
-    if (foundPopupCard && foundPopupCard.width > 0 && foundPopupCard.height > 0) {
+    if (
+      foundPopupCard &&
+      foundPopupCard.width > 0 &&
+      foundPopupCard.height > 0
+    ) {
       const cardW = min(750, width - 180);
       const cardH = cardW * (foundPopupCard.height / foundPopupCard.width);
       const cardY = 180;
-      image(
-        foundPopupCard,
-        width / 2,
-        cardY,
-        cardW,
-        cardH
-      );
+      image(foundPopupCard, width / 2, cardY, cardW, cardH);
     }
     pop();
     if (foundFishMessageTimer <= 0) {
@@ -1166,6 +1196,10 @@ if (gameState === "transition") {
 }
 
 function keyPressed() {
+  if (!audioUnlocked) {
+    userStartAudio();
+    audioUnlocked = true;
+  }
   // --- HOLE CLIMB INPUT (ENTER-mash to climb out) ---
   if (holeState === "climbing" && keyCode === ENTER) {
     const maxFrame = SPRITES.climb.numFrames - 1;
@@ -1176,7 +1210,7 @@ function keyPressed() {
       return;
     }
 
-    const canSlip = (holeClimbFrame === 1 || holeClimbFrame === 2);
+    const canSlip = holeClimbFrame === 1 || holeClimbFrame === 2;
     const setbackChance = 0.3; // tweak as desired
 
     if (Math.random() < setbackChance && canSlip) {
@@ -1192,8 +1226,8 @@ function keyPressed() {
 
   // START SCREEN → ENTER → LEVEL PICKER
   if (gameState === "start" && keyCode === ENTER) {
-      gameState = "level_picker";
-      return;
+    gameState = "level_picker";
+    return;
   }
 
   // TUTORIAL INPUT (tutorial_cards.js)
@@ -1209,7 +1243,7 @@ function keyPressed() {
   if (gameState === "loss" && key === "r") {
     resetGame();
     gameState = "playing";
-    cursor(ARROW)
+    cursor(ARROW);
     return;
   }
 
@@ -1226,7 +1260,7 @@ function resetGame() {
   timerStarted = false;
   finalTime = null;
 
-  totalTime = LEVEL_TIMES[currentLevel];   // reset timer
+  totalTime = LEVEL_TIMES[currentLevel]; // reset timer
   flashTimer = 0;
 
   // reset tutorial state (tutorial_cards.js)
@@ -1265,14 +1299,13 @@ function resetGame() {
   // we arm the “later random border” behaviour for level 3.
   if (currentLevel === 3 && goatHasKilledOnce) {
     goatTriggered = true;
-    goatTriggerTime = millis();   // start delay for second run
+    goatTriggerTime = millis(); // start delay for second run
   }
   if (currentLevel === 3 && goatHasKilledOnce) {
-  goatTriggered = true;
-  goatTriggerTime = millis();
-  goatNextSpawnDelay = 1000; // first goat after retry
-}
-
+    goatTriggered = true;
+    goatTriggerTime = millis();
+    goatNextSpawnDelay = 1000; // first goat after retry
+  }
 }
 
 function signedDistToWall(px, py, w) {
@@ -1310,7 +1343,7 @@ function updateCamera() {
   let targetY = player.y - visibleH * 0.7;
 
   // clamp camera to scaled world
-  targetX = constrain(targetX, 0, (WORLD_W_SCALED - visibleW) - 30);
+  targetX = constrain(targetX, 0, WORLD_W_SCALED - visibleW - 30);
   targetY = constrain(targetY, WORLD_TOP_LIMIT, WORLD_H_SCALED - visibleH);
 
   camX = lerp(camX, targetX, CAM_SMOOTHING);
@@ -1320,7 +1353,7 @@ function updateCamera() {
 function drawTimer() {
   let elapsed = 0;
   if (timerStarted) {
-      elapsed = floor((millis() - startTime) / 1000);
+    elapsed = floor((millis() - startTime) / 1000);
   }
   let timeLeft = totalTime - elapsed;
 
@@ -1337,19 +1370,19 @@ function drawTimer() {
   // body
   let w = 200;
   let h = 70;
-  let x = VIEW_W/2;
+  let x = VIEW_W / 2;
   let y = 70;
 
   // body
   fill(42, 68, 150, 230);
   stroke(130, 170, 230, 200);
   strokeWeight(3);
-  rect(floor(x-w/2), floor(y-h/2), w, h, 8);
+  rect(floor(x - w / 2), floor(y - h / 2), w, h, 8);
   noStroke();
 
   // shine
   fill(255, 255, 255, 50);
-  rect(floor(x-w/2+4), floor(y-h/2+4), w-8, 10, 4);
+  rect(floor(x - w / 2 + 4), floor(y - h / 2 + 4), w - 8, 10, 4);
 
   // FLASH LOGIC
   if (flashTimer > 0) {
@@ -1357,16 +1390,16 @@ function drawTimer() {
 
     // alternate red/white every 10 frames
     if (floor(flashTimer / 10) % 2 === 0) {
-      fill(255, 0, 0);   // red
+      fill(255, 0, 0); // red
     } else {
-      fill(255);         // white
+      fill(255); // white
     }
   } else {
     // normal timer color
     if (timeLeft <= 10) {
       fill(255, 0, 0);
     } else {
-      fill(255);  // your normal color
+      fill(255); // your normal color
     }
   }
 
@@ -1405,16 +1438,16 @@ function handleInput() {
 
   // reset each frame
   player.isMoving = false;
-  
+
   const W = keyIsDown(87);
   const A = keyIsDown(65);
   const S = keyIsDown(83);
   const D = keyIsDown(68);
 
-    // --- FIRST GOAT TUTORIAL TRIGGER (LEVEL 3) ---
+  // --- FIRST GOAT TUTORIAL TRIGGER (LEVEL 3) ---
   if (currentLevel === 3 && W && !goatHasKilledOnce && !goatTriggered) {
     goatTriggered = true;
-    goatTriggerTime = millis();   // start 3s countdown
+    goatTriggerTime = millis(); // start 3s countdown
   }
 
   // --- DIAGONALS FIRST ---
@@ -1423,20 +1456,17 @@ function handleInput() {
     newY -= player.speed;
     player.direction = "wd";
     player.isMoving = true;
-  }
-  else if (A && W) {
+  } else if (A && W) {
     newX -= player.speed;
     newY -= player.speed;
     player.direction = "aw";
     player.isMoving = true;
-  }
-  else if (S && D) {
+  } else if (S && D) {
     newX += player.speed;
     newY += player.speed;
     player.direction = "sd";
     player.isMoving = true;
-  }
-  else if (A && S) {
+  } else if (A && S) {
     newX -= player.speed;
     newY += player.speed;
     player.direction = "as";
@@ -1448,18 +1478,15 @@ function handleInput() {
     newY -= player.speed;
     player.direction = "up";
     player.isMoving = true;
-  }
-  else if (S) {
+  } else if (S) {
     newY += player.speed;
     player.direction = "down";
     player.isMoving = true;
-  }
-  else if (A) {
+  } else if (A) {
     newX -= player.speed;
     player.direction = "left";
     player.isMoving = true;
-  }
-  else if (D) {
+  } else if (D) {
     newX += player.speed;
     player.direction = "right";
     player.isMoving = true;
@@ -1485,24 +1512,25 @@ function handleInput() {
   let r = player.w * 0.45;
 
   // three collision test points (world space)
-  let topX    = newX;
-  let topY    = newY - r;
-  let leftX   = newX - r;
-  let leftY   = newY;
-  let rightX  = newX + r;
-  let rightY  = newY;
+  let topX = newX;
+  let topY = newY - r;
+  let leftX = newX - r;
+  let leftY = newY;
+  let rightX = newX + r;
+  let rightY = newY;
 
   for (let w of walls) {
     function crossed(px, py) {
       let d0 = pointSide(player.x, player.y, w.x1, w.y1, w.x2, w.y2);
-      let d1 = pointSide(px, py,        w.x1, w.y1, w.x2, w.y2);
+      let d1 = pointSide(px, py, w.x1, w.y1, w.x2, w.y2);
       return d0 * d1 < 0;
     }
 
-    if (crossed(topX, topY) ||
-        crossed(leftX, leftY) ||
-        crossed(rightX, rightY)) {
-
+    if (
+      crossed(topX, topY) ||
+      crossed(leftX, leftY) ||
+      crossed(rightX, rightY)
+    ) {
       let mx = newX - player.x;
       let my = newY - player.y;
 
@@ -1538,22 +1566,26 @@ function handleInput() {
   }
 
   let dx = newX - player.x;
-  let stepX = dx === 0 ? 0 : (dx > 0 ? 1 : -1);
+  let stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
   for (let i = 0; i < Math.abs(dx); i++) {
     let testX = player.x + stepX;
-    if (!wouldCollideWithSpike(testX, player.y) &&
-        isLegalPosition(testX, player.y)) {
+    if (
+      !wouldCollideWithSpike(testX, player.y) &&
+      isLegalPosition(testX, player.y)
+    ) {
       player.x = testX;
     } else {
       break;
     }
   }
   let dy = newY - player.y;
-  let stepY = dy === 0 ? 0 : (dy > 0 ? 1 : -1);
+  let stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1;
   for (let i = 0; i < Math.abs(dy); i++) {
     let testY = player.y + stepY;
-    if (!wouldCollideWithSpike(player.x, testY) &&
-        isLegalPosition(player.x, testY)) {
+    if (
+      !wouldCollideWithSpike(player.x, testY) &&
+      isLegalPosition(player.x, testY)
+    ) {
       player.y = testY;
     } else {
       break;
@@ -1597,11 +1629,7 @@ function checkFishCollision() {
   let fh = fish.h;
 
   // AABB collision
-  let overlap =
-    px < fx + fw &&
-    px + pw > fx &&
-    py < fy + fh &&
-    py + ph > fy;
+  let overlap = px < fx + fw && px + pw > fx && py < fy + fh && py + ph > fy;
 
   if (overlap) {
     fish.collected = true;
@@ -1626,7 +1654,8 @@ function checkHoleCollision() {
   for (const h of holes) {
     if (h.immuneUntil && millis() < h.immuneUntil) continue;
 
-    const holeRadius = (hole.width * HOLE_VISUAL_SCALE) * HOLE_TRIGGER_RADIUS_FACTOR;
+    const holeRadius =
+      hole.width * HOLE_VISUAL_SCALE * HOLE_TRIGGER_RADIUS_FACTOR;
     const d = dist(player.x, player.y, h.x, h.y);
 
     if (d < holeRadius) {
@@ -1791,23 +1820,24 @@ function drawCharacterOnScreen() {
     let dw = sw * cfg.scale;
     let dh = sh * cfg.scale;
     let screenX = (player.x - camX) * camZoom * bgScale - dw / 2 + stompOffsetX;
-    let screenY = (player.y - camY) * camZoom * bgScale - dh + 10 + stompOffsetY;
+    let screenY =
+      (player.y - camY) * camZoom * bgScale - dh + 10 + stompOffsetY;
     image(cfg.img, screenX, screenY, dw, dh, sx, sy, sw, sh);
     return;
   }
 
   let cfg = SPRITES[player.direction];
-  let f   = player.currentFrame;
+  let f = player.currentFrame;
 
   // cropping
-  let cropL = cfg.cropLeft[f]  || 0;
+  let cropL = cfg.cropLeft[f] || 0;
   let cropR = cfg.cropRight[f] || 0;
-  let cropT = cfg.cropTop[f]   || 0;
-  let cropB = cfg.cropBottom[f]|| 0;
+  let cropT = cfg.cropTop[f] || 0;
+  let cropB = cfg.cropBottom[f] || 0;
 
   let sx = f * cfg.frameWidth + cropL;
   let sy = cropT;
-  let sw = cfg.frameWidth  - cropL - cropR;
+  let sw = cfg.frameWidth - cropL - cropR;
   let sh = cfg.frameHeight - cropT - cropB;
 
   // fixed-size penguin (never scales)
@@ -1815,8 +1845,8 @@ function drawCharacterOnScreen() {
   let dh = sh * cfg.scale;
   player.w = dw;
   player.h = dh;
-  player.offsetX = (cropL - cropR) * cfg.scale / 2;
-  player.offsetY = (cropT - cropB) * cfg.scale / 2;
+  player.offsetX = ((cropL - cropR) * cfg.scale) / 2;
+  player.offsetY = ((cropT - cropB) * cfg.scale) / 2;
 
   // correct world → screen conversion
   let screenX = (player.x - camX) * camZoom * bgScale - dw / 2;
@@ -1905,7 +1935,7 @@ function drawBlizzardOverlay() {
   // Diagonals
   if (dir === "wd") angle = -3 * QUARTER_PI;
   if (dir === "aw") angle = 3 * QUARTER_PI;
-  if (dir === "sd") angle = -QUARTER_PI; 
+  if (dir === "sd") angle = -QUARTER_PI;
   if (dir === "as") angle = QUARTER_PI;
 
   // Direction-specific offsets
@@ -1921,10 +1951,10 @@ function drawBlizzardOverlay() {
   blizzardBuffer.rotate(angle);
 
   blizzardBuffer.beginShape();
-  blizzardBuffer.vertex(-flashlight.baseWidth/2, 0);
-  blizzardBuffer.vertex(flashlight.baseWidth/2, 0);
-  blizzardBuffer.vertex(flashlight.endWidth/2, len);
-  blizzardBuffer.vertex(-flashlight.endWidth/2, len);
+  blizzardBuffer.vertex(-flashlight.baseWidth / 2, 0);
+  blizzardBuffer.vertex(flashlight.baseWidth / 2, 0);
+  blizzardBuffer.vertex(flashlight.endWidth / 2, len);
+  blizzardBuffer.vertex(-flashlight.endWidth / 2, len);
   blizzardBuffer.endShape(CLOSE);
 
   blizzardBuffer.pop();
@@ -1934,6 +1964,10 @@ function drawBlizzardOverlay() {
 }
 
 function mousePressed() {
+  if (!audioUnlocked) {
+    userStartAudio();
+    audioUnlocked = true;
+  }
   // --- TUTORIAL MOUSE INPUT (tutorial_cards.js) ---
   if (handleTutorialMousePressed()) return;
 
@@ -1946,51 +1980,70 @@ function mousePressed() {
 
   // --- LEVEL PICKER CLICK ---
   if (gameState === "level_picker") {
-      handleLevelPickerClick();
-      return;
+    handleLevelPickerClick();
+    return;
   }
 
   /// --- START SCREEN BUTTON PRESS ---
   if (gameState === "start") {
-      if (mouseX > START_BTN.x && mouseX < START_BTN.x + START_BTN.w &&
-          mouseY > START_BTN.y && mouseY < START_BTN.y + START_BTN.h) {
-        startBtnPressed = true;
-      }
-      return;
+    if (
+      mouseX > START_BTN.x &&
+      mouseX < START_BTN.x + START_BTN.w &&
+      mouseY > START_BTN.y &&
+      mouseY < START_BTN.y + START_BTN.h
+    ) {
+      startBtnPressed = true;
+    }
+    return;
   }
 
   // --- WIN SCREEN BUTTON ---
   if (gameState === "win") {
-    let bx = width/2;
+    let bx = width / 2;
     let by = height * 0.82;
     let bw = 320;
     let bh = 64;
 
-    if (mouseX > bx-bw/2 && mouseX < bx+bw/2 &&
-         mouseY > by-bh/2 && mouseY < by+bh/2) {
-        winBtnPressed = true;
+    if (
+      mouseX > bx - bw / 2 &&
+      mouseX < bx + bw / 2 &&
+      mouseY > by - bh / 2 &&
+      mouseY < by + bh / 2
+    ) {
+      winBtnPressed = true;
     }
   }
 
-    // --- LOSS SCREEN BUTTON ---
+  // --- LOSS SCREEN BUTTON ---
   if (gameState === "loss") {
-    let bx = width/2;
+    let bx = width / 2;
     let by = height * 0.45;
     let bw = 320;
     let bh = 64;
 
-    if (mouseX > bx-bw/2 && mouseX < bx+bw/2 &&
-        mouseY > by-bh/2 && mouseY < by+bh/2) {
-        lossBtnPressed = true;
+    if (
+      mouseX > bx - bw / 2 &&
+      mouseX < bx + bw / 2 &&
+      mouseY > by - bh / 2 &&
+      mouseY < by + bh / 2
+    ) {
+      lossBtnPressed = true;
     }
-    }
+  }
 
   // --- LEVEL PICKER BUTTON (win + loss screens) ---
   if (gameState === "win" || gameState === "loss") {
-    let bx = width/2, by = height*0.90, bw = 320, bh = 56;
+    let bx = width / 2,
+      by = height * 0.9,
+      bw = 320,
+      bh = 56;
 
-    if (mouseX > bx-bw/2 && mouseX < bx+bw/2 &&
-      mouseY > by-bh/2 && mouseY < by+bh/2) {
+    if (
+      mouseX > bx - bw / 2 &&
+      mouseX < bx + bw / 2 &&
+      mouseY > by - bh / 2 &&
+      mouseY < by + bh / 2
+    ) {
       levelPickerBtnPressed = true;
     }
   }
@@ -2002,16 +2055,19 @@ function mouseReleased() {
 
   // --- START SCREEN BUTTON RELEASE ---
   if (gameState === "start") {
-  let hover = mouseX > START_BTN.x && mouseX < START_BTN.x + START_BTN.w &&
-              mouseY > START_BTN.y && mouseY < START_BTN.y + START_BTN.h;
+    let hover =
+      mouseX > START_BTN.x &&
+      mouseX < START_BTN.x + START_BTN.w &&
+      mouseY > START_BTN.y &&
+      mouseY < START_BTN.y + START_BTN.h;
 
-  if (startBtnPressed && hover) {
-    gameState = "level_picker";
+    if (startBtnPressed && hover) {
+      gameState = "level_picker";
+    }
+
+    startBtnPressed = false;
+    return;
   }
-
-  startBtnPressed = false;
-  return;
-}
 
   // --- LEVEL PICKER PLAY BUTTON RELEASE ---
   if (gameState === "level_picker" && activePanelIndex !== -1) {
@@ -2028,40 +2084,47 @@ function mouseReleased() {
   // --- WIN / LOSS BUTTON RELEASES ---
   if (gameState === "win" || gameState === "loss") {
     // Level Picker button (bottom)
-    let lpBx = width/2, lpBy = height*0.90, lpBw = 320, lpBh = 56;
+    let lpBx = width / 2,
+      lpBy = height * 0.9,
+      lpBw = 320,
+      lpBh = 56;
     let lpHover =
-      mouseX > lpBx-lpBw/2 && mouseX < lpBx+lpBw/2 &&
-      mouseY > lpBy-lpBh/2 && mouseY < lpBy+lpBh/2;
+      mouseX > lpBx - lpBw / 2 &&
+      mouseX < lpBx + lpBw / 2 &&
+      mouseY > lpBy - lpBh / 2 &&
+      mouseY < lpBy + lpBh / 2;
 
-if (levelPickerBtnPressed && lpHover) {
-  // Show loading transition after winning Level 1
-  // or when leaving the Lost screen
-  if (
-    (gameState === "win" && currentLevel === 1) ||
-    gameState === "loss"
-  ) {
-    startLevelPickerTransition();
-  } else {
-    gameState = "level_picker";
-  }
-}
+    if (levelPickerBtnPressed && lpHover) {
+      // Show loading transition after winning Level 1
+      // or when leaving the Lost screen
+      if ((gameState === "win" && currentLevel === 1) || gameState === "loss") {
+        startLevelPickerTransition();
+      } else {
+        gameState = "level_picker";
+      }
+    }
 
-    let lossBx = width/2, lossBy = height*0.45, lossBw = 320, lossBh = 64;
+    let lossBx = width / 2,
+      lossBy = height * 0.45,
+      lossBw = 320,
+      lossBh = 64;
     let lossHover =
-      mouseX > lossBx-lossBw/2 && mouseX < lossBx+lossBw/2 &&
-      mouseY > lossBy-lossBh/2 && mouseY < lossBy+lossBh/2;
+      mouseX > lossBx - lossBw / 2 &&
+      mouseX < lossBx + lossBw / 2 &&
+      mouseY > lossBy - lossBh / 2 &&
+      mouseY < lossBy + lossBh / 2;
 
     if (lossBtnPressed && lossHover && gameState === "loss") {
       resetGame();
 
-      startTime = millis();     // new starting point
-      timerStarted = true;      // force timer to run
-      gameEnded = false;        // prevent auto-loss
-      finalTime = null;         // clear old result
+      startTime = millis(); // new starting point
+      timerStarted = true; // force timer to run
+      gameEnded = false; // prevent auto-loss
+      finalTime = null; // clear old result
 
       tutorialActive = false;
       postTutorialTimerActive = false;
-      tutorialIndex = 999;      // mark tutorial as finished
+      tutorialIndex = 999; // mark tutorial as finished
 
       gameState = "playing";
       cursor(ARROW);
