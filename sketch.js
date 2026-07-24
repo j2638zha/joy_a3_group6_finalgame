@@ -15,8 +15,15 @@ let levelPickerBg;
 let introMusic;
 let gameMusic;
 let fishCollect;
+let fishCallFar = []; // "searching" clips, alternate when fish is far
+let fishCallNear; // plays when penguin is close
+let winSound;
+let loseSound;
+let walkSound;
+let stompSound;
 let audioUnlocked = false;
 let musicGateOpen = false; // false = "click anywhere to begin" overlay is showing
+let lastScreenSound = ""; // which of win/loss we've already played the sound for
 
 let transitionStartTime = 0;
 const TRANSITION_DURATION = 3000;
@@ -544,6 +551,13 @@ function preload() {
   introMusic = loadSound("assets/sounds/introscreen.mp3");
   gameMusic = loadSound("assets/sounds/game_background_music.mp3");
   fishCollect = loadSound("assets/sounds/fish_collect_sound.mp3");
+  fishCallFar[0] = loadSound("assets/sounds/shelby_comefindme.mp3");
+  fishCallFar[1] = loadSound("assets/sounds/shelby_imhere.mp3");
+  fishCallNear = loadSound("assets/sounds/shelby_imnearyou.mp3");
+  winSound = loadSound("assets/sounds/win_screen_sound.mp3");
+  loseSound = loadSound("assets/sounds/lose_screen_sound.mp3");
+  walkSound = loadSound("assets/sounds/penguin_walking_sound.mp3");
+  stompSound = loadSound("assets/sounds/penguin_stomping_sound.mp3");
 
   // Tutorial card assets (tutorial_cards.js)
   preloadTutorialAssets();
@@ -950,6 +964,70 @@ function unlockAudio() {
       /* no gesture yet — a later event will retry */
     });
 }
+// Fish calls — pings every few seconds, louder the closer the penguin is.
+// Far away: alternates between the two "searching" clips.
+// Close: switches to the dedicated "I'm near you" clip.
+const FISH_CALL_MAX_VOL = 0.8;
+const FISH_CALL_MIN_VOL = 0.1;
+const FISH_CALL_FALLOFF = 900; // distance at which pings are quietest
+const FISH_CALL_INTERVAL = 6000; // ms between pings
+const FISH_NEAR_DIST = 250; // within this distance → "I'm near you"
+
+let lastFishCallTime = 0;
+let farCallIndex = 0; // which "searching" clip plays next
+
+function updateFishCall() {
+  if (!audioUnlocked || getAudioContext().state !== "running") return;
+
+  const playing =
+    gameState !== "start" &&
+    gameState !== "win" &&
+    gameState !== "loss" &&
+    gameState !== "transition" &&
+    gameState !== "level_picker" &&
+    !fish.collected;
+
+  if (!playing) return;
+
+  if (millis() - lastFishCallTime < FISH_CALL_INTERVAL) return;
+  lastFishCallTime = millis();
+
+  const d = dist(player.x, player.y, fish.x, fish.y);
+
+  // Pick the clip: near → dedicated clip, far → alternate the two searching ones.
+  let clip;
+  if (d < FISH_NEAR_DIST) {
+    clip = fishCallNear;
+  } else {
+    clip = fishCallFar[farCallIndex];
+    farCallIndex = (farCallIndex + 1) % fishCallFar.length; // take turns
+  }
+
+  if (!clip || !clip.isLoaded()) return;
+
+  // Volume from distance. Closer = louder.
+  let vol = map(d, 0, FISH_CALL_FALLOFF, FISH_CALL_MAX_VOL, FISH_CALL_MIN_VOL);
+  vol = constrain(vol, FISH_CALL_MIN_VOL, FISH_CALL_MAX_VOL);
+
+  clip.setVolume(vol);
+  clip.play();
+}
+
+function updateScreenSounds() {
+  if (!audioUnlocked || getAudioContext().state !== "running") return;
+
+  if (gameState === "win" && lastScreenSound !== "win") {
+    lastScreenSound = "win";
+    if (stompSound && stompSound.isPlaying()) stompSound.stop(); // ← add
+    if (winSound && winSound.isLoaded()) winSound.play();
+  } else if (gameState === "loss" && lastScreenSound !== "loss") {
+    lastScreenSound = "loss";
+    if (stompSound && stompSound.isPlaying()) stompSound.stop(); // ← add
+    if (loseSound && loseSound.isLoaded()) loseSound.play();
+  } else if (gameState !== "win" && gameState !== "loss") {
+    lastScreenSound = "";
+  }
+}
 
 function updateMusic() {
   if (!audioUnlocked) return;
@@ -988,6 +1066,8 @@ function updateMusic() {
 function draw() {
   // START SCREEN
   updateMusic();
+  updateScreenSounds();
+  updateFishCall();
   if (gameState === "start") {
     drawStartScreen();
     return;
@@ -1032,6 +1112,7 @@ function draw() {
 
   handleInput();
   animateSprite();
+  updateWalkSound();
   updateCamera();
   updateStompAnimation();
   checkFishCollision();
@@ -1346,6 +1427,8 @@ function resetGame() {
 
   fish.collected = false;
   randomizeFishPosition();
+  lastFishCallTime = millis();
+  farCallIndex = 0;
 
   // HOLE SEQUENCE RESET
   holeState = "none";
@@ -1480,7 +1563,44 @@ function drawTimer() {
   text(timerText, width / 2, 60);
 }
 
+function updateWalkSound() {
+  if (!walkSound || !walkSound.isLoaded()) return;
+  if (!audioUnlocked || getAudioContext().state !== "running") return;
+
+  // Only while actually walking during play — not while stomping, in a hole,
+  // or on any menu screen.
+  const walking =
+    gameState === "playing" &&
+    player.isMoving &&
+    !stompAnimating &&
+    holeState === "none";
+
+  if (walking) {
+    if (!walkSound.isPlaying()) {
+      walkSound.setVolume(0.5);
+      walkSound.loop();
+    }
+  } else if (walkSound.isPlaying()) {
+    walkSound.stop();
+  }
+}
+
 function handleInput() {
+  // --- STOMP ---
+  if (keyIsDown(32) && !stompAnimating) {
+    stompAnimating = true;
+    stompFrame = 0;
+    stompFrameTimer = 0;
+    waveDelay = 0;
+    waveDelayActive = false;
+    totalTime = max(0, totalTime - 45);
+    flashTimer = 150;
+
+    // --- STOMP SOUND ---
+    if (stompSound && stompSound.isLoaded()) {
+      stompSound.play();
+    }
+  }
   // Penguin is fully frozen while any tutorial card is on screen —
   // including the last (space dialogue) card. Movement is allowed
   // only when tutorialActive is false, i.e. normal play and the gap
