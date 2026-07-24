@@ -14,6 +14,7 @@ let levelPickerBg;
 // AUDIO
 let introMusic;
 let audioUnlocked = false;
+let musicGateOpen = false; // false = "click anywhere to begin" overlay is showing
 
 let transitionStartTime = 0;
 const TRANSITION_DURATION = 3000;
@@ -589,6 +590,12 @@ function setup() {
   // you played.
   blizzardBuffer = createGraphics(VIEW_W, VIEW_H);
   loadLevel(1);
+  unlockAudio();
+
+  // Catch the very first interaction of any kind, anywhere on the page
+  for (const evt of ["pointerdown", "keydown", "touchstart"]) {
+    window.addEventListener(evt, unlockAudio, { once: false });
+  }
 }
 
 let DEBUG_SHOW_WALLS = false; // shows wall lines in red — set to false when done
@@ -806,6 +813,33 @@ function drawStartScreen() {
   imageMode(CORNER);
   image(startBg, 0, 0, width, height);
 
+  // --- CLICK-TO-BEGIN GATE ---
+  if (!musicGateOpen) {
+    push();
+    noStroke();
+    fill(0, 0, 0, 89); // 35% of 255
+    rect(0, 0, width, height);
+
+    // gentle pulse so it reads as interactive
+    const pulse = 200 + sin(frameCount * 0.06) * 55;
+
+    textFont(gameFont);
+    textAlign(CENTER, CENTER);
+    textSize(56);
+    textStyle(BOLD);
+
+    fill(10, 20, 70, 200);
+    text("click anywhere to begin", width / 2 + 3, height / 2 + 3);
+
+    fill(230, 242, 255, pulse);
+    text("click anywhere to begin", width / 2, height / 2);
+    pop();
+
+    cursor(HAND);
+    return; // skip the Start-button hover entirely
+  }
+
+  // --- NORMAL START SCREEN (gate is open) ---
   let hover =
     mouseX > START_BTN.x &&
     mouseX < START_BTN.x + START_BTN.w &&
@@ -902,12 +936,21 @@ function drawTransitionScreen() {
     gameState = "level_picker";
   }
 }
-
-// audio
+function unlockAudio() {
+  if (audioUnlocked) return;
+  userStartAudio()
+    .then(() => {
+      audioUnlocked = true;
+    })
+    .catch(() => {
+      /* no gesture yet — a later event will retry */
+    });
+}
 
 function updateStartMusic() {
   if (!introMusic || !introMusic.isLoaded()) return;
-  if (!audioUnlocked) return; // browsers block audio before a click/keypress
+  if (!audioUnlocked) return;
+  if (getAudioContext().state !== "running") return; // ← the important line
 
   if (gameState === "start") {
     if (!introMusic.isPlaying()) {
@@ -915,9 +958,10 @@ function updateStartMusic() {
       introMusic.loop();
     }
   } else if (introMusic.isPlaying()) {
-    introMusic.stop(); // or .pause() if you want it to resume where it left off
+    introMusic.stop();
   }
 }
+
 function draw() {
   // START SCREEN
   updateStartMusic();
@@ -1196,10 +1240,12 @@ function draw() {
 }
 
 function keyPressed() {
-  if (!audioUnlocked) {
-    userStartAudio();
-    audioUnlocked = true;
+  unlockAudio();
+  if (gameState === "start" && !musicGateOpen) {
+    musicGateOpen = true;
+    return;
   }
+
   // --- HOLE CLIMB INPUT (ENTER-mash to climb out) ---
   if (holeState === "climbing" && keyCode === ENTER) {
     const maxFrame = SPRITES.climb.numFrames - 1;
@@ -1964,10 +2010,14 @@ function drawBlizzardOverlay() {
 }
 
 function mousePressed() {
-  if (!audioUnlocked) {
-    userStartAudio();
-    audioUnlocked = true;
+  unlockAudio();
+  // First click on the title screen only opens the gate + starts the music.
+  // It must NOT also press Start, or the player skips the title screen.
+  if (gameState === "start" && !musicGateOpen) {
+    musicGateOpen = true;
+    return;
   }
+
   // --- TUTORIAL MOUSE INPUT (tutorial_cards.js) ---
   if (handleTutorialMousePressed()) return;
 
@@ -2055,6 +2105,12 @@ function mouseReleased() {
 
   // --- START SCREEN BUTTON RELEASE ---
   if (gameState === "start") {
+    if (!musicGateOpen) {
+      // ← add this
+      startBtnPressed = false;
+      return;
+    }
+
     let hover =
       mouseX > START_BTN.x &&
       mouseX < START_BTN.x + START_BTN.w &&
