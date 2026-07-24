@@ -13,6 +13,7 @@ let levelPickerBg;
 
 // AUDIO
 let introMusic;
+let gameMusic;
 let audioUnlocked = false;
 let musicGateOpen = false; // false = "click anywhere to begin" overlay is showing
 
@@ -540,6 +541,7 @@ function preload() {
   lossBg = loadImage("assets/images/loss_screen.png");
   transitionPage = loadImage("assets/images/transition_page.png");
   introMusic = loadSound("assets/sounds/introscreen.mp3");
+  gameMusic = loadSound("assets/sounds/game_background_music.mp3");
 
   // Tutorial card assets (tutorial_cards.js)
   preloadTutorialAssets();
@@ -947,24 +949,43 @@ function unlockAudio() {
     });
 }
 
-function updateStartMusic() {
-  if (!introMusic || !introMusic.isLoaded()) return;
+function updateMusic() {
   if (!audioUnlocked) return;
-  if (getAudioContext().state !== "running") return; // ← the important line
+  if (getAudioContext().state !== "running") return;
 
-  if (gameState === "start") {
-    if (!introMusic.isPlaying()) {
+  const wantIntro = gameState === "start";
+  const wantGame = ![
+    "start",
+    "win",
+    "loss",
+    "transition",
+    "level_picker",
+  ].includes(gameState);
+
+  // --- INTRO TRACK (title screen only) ---
+  if (introMusic && introMusic.isLoaded()) {
+    if (wantIntro && !introMusic.isPlaying()) {
       introMusic.setVolume(0.5);
       introMusic.loop();
+    } else if (!wantIntro && introMusic.isPlaying()) {
+      introMusic.stop();
     }
-  } else if (introMusic.isPlaying()) {
-    introMusic.stop();
+  }
+
+  // --- GAMEPLAY TRACK ---
+  if (gameMusic && gameMusic.isLoaded()) {
+    if (wantGame && !gameMusic.isPlaying()) {
+      gameMusic.setVolume(0.35); // sits under the intro so it doesn't dominate
+      gameMusic.loop();
+    } else if (!wantGame && gameMusic.isPlaying()) {
+      gameMusic.stop();
+    }
   }
 }
 
 function draw() {
   // START SCREEN
-  updateStartMusic();
+  updateMusic();
   if (gameState === "start") {
     drawStartScreen();
     return;
