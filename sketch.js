@@ -1111,8 +1111,8 @@ function draw() {
   }
 
   handleInput();
-  animateSprite();
   updateWalkSound();
+  animateSprite();
   updateCamera();
   updateStompAnimation();
   checkFishCollision();
@@ -1567,13 +1567,27 @@ function updateWalkSound() {
   if (!walkSound || !walkSound.isLoaded()) return;
   if (!audioUnlocked || getAudioContext().state !== "running") return;
 
-  // Only while actually walking during play — not while stomping, in a hole,
-  // or on any menu screen.
+  // Are any movement keys currently held? WASD + arrow keys.
+  const movementHeld =
+    keyIsDown(87) ||
+    keyIsDown(65) ||
+    keyIsDown(83) ||
+    keyIsDown(68) || // W A S D
+    keyIsDown(UP_ARROW) ||
+    keyIsDown(DOWN_ARROW) ||
+    keyIsDown(LEFT_ARROW) ||
+    keyIsDown(RIGHT_ARROW);
+
+  // Only during actual play — never on menus, mid-stomp, or in a hole.
+  const onMenu =
+    gameState === "start" ||
+    gameState === "win" ||
+    gameState === "loss" ||
+    gameState === "transition" ||
+    gameState === "level_picker";
+
   const walking =
-    gameState === "playing" &&
-    player.isMoving &&
-    !stompAnimating &&
-    holeState === "none";
+    movementHeld && !onMenu && !stompAnimating && holeState === "none";
 
   if (walking) {
     if (!walkSound.isPlaying()) {
