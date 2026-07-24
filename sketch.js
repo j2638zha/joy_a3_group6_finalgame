@@ -21,6 +21,7 @@ let winSound;
 let loseSound;
 let walkSound;
 let stompSound;
+let stompAura;
 let audioUnlocked = false;
 let musicGateOpen = false; // false = "click anywhere to begin" overlay is showing
 let lastScreenSound = ""; // which of win/loss we've already played the sound for
@@ -544,6 +545,7 @@ function preload() {
   SPRITES.aw.img = loadImage("assets/images/aw_key_penguin.png");
   SPRITES.sd.img = loadImage("assets/images/sd_key_penguin.png");
   SPRITES.as.img = loadImage("assets/images/as_key_penguin.png");
+  preloadStoryAssets();
   startBg = loadImage("assets/images/title_screen.png");
   winBg = loadImage("assets/images/win_screen.png");
   lossBg = loadImage("assets/images/loss_screen.png");
@@ -558,6 +560,7 @@ function preload() {
   loseSound = loadSound("assets/sounds/lose_screen_sound.mp3");
   walkSound = loadSound("assets/sounds/penguin_walking_sound.mp3");
   stompSound = loadSound("assets/sounds/penguin_stomping_sound.mp3");
+  stompAura = loadSound("assets/sounds/stomping_aura.mp3");
 
   // Tutorial card assets (tutorial_cards.js)
   preloadTutorialAssets();
@@ -1064,6 +1067,11 @@ function updateMusic() {
 }
 
 function draw() {
+  if (gameState === "story") {
+    drawStoryScreen();
+    return;
+  }
+
   // START SCREEN
   updateMusic();
   updateScreenSounds();
@@ -1344,6 +1352,19 @@ function draw() {
 }
 
 function keyPressed() {
+  // STORY SCREEN → ENTER → next panel / leave
+  if (gameState === "story" && keyCode === ENTER) {
+    advanceStory();
+    return;
+  }
+
+  // START SCREEN → ENTER → STORY
+  if (gameState === "start" && keyCode === ENTER) {
+    beginStory(); // was: gameState = "level_picker";
+
+    return;
+  }
+
   unlockAudio();
   if (gameState === "start" && !musicGateOpen) {
     musicGateOpen = true;
@@ -2099,6 +2120,11 @@ function startWaveForFrame(frameIndex) {
   waveActive = true;
   waveRadius = 0;
 
+  // --- AURA SOUND (fires when the blue ring activates) ---
+  if (stompAura && stompAura.isLoaded()) {
+    stompAura.play();
+  }
+
   const duration = STOMP_FRAME_DURATIONS[frameIndex];
   waveGrowth = waveMaxRadius / duration;
 }
@@ -2173,6 +2199,11 @@ function drawBlizzardOverlay() {
 }
 
 function mousePressed() {
+  if (gameState === "story") {
+    handleStoryClick();
+    return;
+  }
+
   unlockAudio();
   // First click on the title screen only opens the gate + starts the music.
   // It must NOT also press Start, or the player skips the title screen.
@@ -2263,6 +2294,10 @@ function mousePressed() {
 }
 
 function mouseReleased() {
+  if (startBtnPressed && hover) {
+    beginStory(); // was: gameState = "level_picker";
+  }
+
   // --- TUTORIAL MOUSE INPUT (tutorial_cards.js) ---
   if (handleTutorialMouseReleased()) return;
 
