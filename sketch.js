@@ -14,6 +14,7 @@ let levelPickerBg;
 // AUDIO
 let introMusic;
 let gameMusic;
+let fishCollect;
 let audioUnlocked = false;
 let musicGateOpen = false; // false = "click anywhere to begin" overlay is showing
 
@@ -542,6 +543,7 @@ function preload() {
   transitionPage = loadImage("assets/images/transition_page.png");
   introMusic = loadSound("assets/sounds/introscreen.mp3");
   gameMusic = loadSound("assets/sounds/game_background_music.mp3");
+  fishCollect = loadSound("assets/sounds/fish_collect_sound.mp3");
 
   // Tutorial card assets (tutorial_cards.js)
   preloadTutorialAssets();
@@ -1700,6 +1702,12 @@ function checkFishCollision() {
 
   if (overlap) {
     fish.collected = true;
+
+    // --- COLLECT SOUND ---
+    if (fishCollect && fishCollect.isLoaded()) {
+      fishCollect.setVolume(0.7);
+      fishCollect.play();
+    }
 
     // --- NEW POPUP TRIGGER ---
     foundFishMessageActive = true;
