@@ -68,6 +68,7 @@ function pageFullyShown() {
 
 function leaveStory() {
   if (storyAudio && storyAudio.isPlaying()) storyAudio.stop();
+  if (storyAudioButWhy && storyAudioButWhy.isPlaying()) storyAudioButWhy.stop();
   gameState = "level_picker";
 }
 
@@ -91,16 +92,19 @@ function skipStory() {
 function advanceStory() {
   if (storyEntering) return;
 
-  if (!pageFullyShown()) {
+  // If the current page hasn't finished fading, snap it full AND move on
+  // in the same press (don't force a second click).
+  if (isLastPage()) {
+    // last page → finish and leave
     for (const p of STORY_PAGES[storyPage]) storyPanelAlphas[p] = 255;
+    leaveStory();
     return;
   }
 
-  if (isLastPage()) {
-    leaveStory();
-  } else {
-    storyPage++;
-  }
+  // Not last page: go to the next page and show its panels immediately,
+  // so there's no black gap waiting for the audio cue.
+  storyPage++;
+  for (const p of STORY_PAGES[storyPage]) storyPanelAlphas[p] = 255;
 }
 
 const STORY_CONTINUE_BTN = { x: 0, y: 0, w: 260, h: 60 };
