@@ -2294,10 +2294,6 @@ function mousePressed() {
 }
 
 function mouseReleased() {
-  if (startBtnPressed && hover) {
-    beginStory(); // was: gameState = "level_picker";
-  }
-
   // --- TUTORIAL MOUSE INPUT (tutorial_cards.js) ---
   if (handleTutorialMouseReleased()) return;
 
@@ -2316,7 +2312,7 @@ function mouseReleased() {
       mouseY < START_BTN.y + START_BTN.h;
 
     if (startBtnPressed && hover) {
-      gameState = "level_picker";
+      beginStory();
     }
 
     startBtnPressed = false;
