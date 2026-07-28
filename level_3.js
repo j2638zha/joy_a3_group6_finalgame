@@ -1,24 +1,23 @@
 const LEVEL3_FISH_SPAWNS = [
-  { x: 85, y: 1502},
-  { x: 1124, y: 1517},
-  { x: 735, y: 1032},
+  { x: 85, y: 1502 },
+  { x: 1124, y: 1517 },
+  { x: 735, y: 1032 },
 ];
 
 const LEVEL3_HOLES = [
-  { x: 585, y: 1122},
-  { x: 966, y: 1157},
-  { x: 889, y: 702},
-  { x: 645, y: 869},
-  { x: 282, y: 947},
-  { x: 329, y: 569},
-  { x: 633, y: 459},
-]
+  { x: 585, y: 1122 },
+  { x: 966, y: 1157 },
+  { x: 889, y: 702 },
+  { x: 645, y: 869 },
+  { x: 282, y: 947 },
+  { x: 329, y: 569 },
+  { x: 633, y: 459 },
+];
 
 let avalancheCard3;
 let goatCard;
 let level3CardActive = false;
 let level3CardStep = 0;
-
 
 function preloadLevel3Assets() {
   avalancheCard3 = loadImage("assets/images/avalanche_card3.png");
@@ -61,60 +60,60 @@ function drawLevel3CardOverlay() {
 function getLevel3FishStart(WORLD_W_SCALED, WORLD_H_SCALED) {
   return {
     x: WORLD_W_SCALED / 2,
-    y: WORLD_H_SCALED / 2 + 700
+    y: WORLD_H_SCALED / 2 + 700,
   };
 }
 
 function buildLevel3Walls(WORLD_W_SCALED, WORLD_H_SCALED) {
-  return [ 
+  return [
     {
       x1: 74,
       y1: 1497,
       x2: 242,
-      y2: 772
+      y2: 772,
     },
     {
       x1: 242,
       y1: 772,
       x2: 356,
-      y2: 522
+      y2: 522,
     },
     {
       x1: 356,
       y1: 522,
       x2: 468,
-      y2: 379
+      y2: 379,
     },
     {
       //across line
       x1: 510,
       y1: 300,
       x2: 700,
-      y2: 300
+      y2: 300,
     },
     {
       x1: 750,
       y1: 358,
       x2: 851,
-      y2: 476
+      y2: 476,
     },
     {
       x1: 927,
       y1: 603,
       x2: 1079,
-      y2: 1047
-     },
+      y2: 1047,
+    },
     {
-     x1: 1079,
-     y1: 1047,
-     x2: 1125,
-     y2: 1212
-    }
+      x1: 1079,
+      y1: 1047,
+      x2: 1125,
+      y2: 1212,
+    },
   ];
 }
 
 const LEVEL3_SPIKES = [
-   { x: 469, y: 362, variant: 0 },
+  { x: 469, y: 362, variant: 0 },
   { x: 495, y: 366, variant: 0 },
   { x: 517, y: 366, variant: 0 },
   { x: 544, y: 366, variant: 0 },
@@ -270,44 +269,44 @@ let goatActive = false;
 let goatStartTime = 0;
 let goatInitialized = false;
 let goatDirection = "left";
-let goatHasKilledOnce = false;   // has the tutorial kill already happened?
-let goatTriggered = false;       // generic “run across screen” trigger
-let goatTriggerTime = 0;         // when we started the countdown
-let goatSpeed = 4;               // movement speed
-let goatNextSpawnDelay = 3000;  // first retry goat comes after 3s
+let goatHasKilledOnce = false; // has the tutorial kill already happened?
+let goatTriggered = false; // generic “run across screen” trigger
+let goatTriggerTime = 0; // when we started the countdown
+let goatSpeed = 4; // movement speed
+let goatNextSpawnDelay = 3000; // first retry goat comes after 3s
 let goatFrameTimer = 0;
 
 // Get a goat frame from the correct row (0 = left, 1 = right)
 function getGoatFrame(index, row) {
-    const cfg = SPRITES.goat;
+  const cfg = SPRITES.goat;
 
-    const fw = cfg.frameWidth;
-    const fh = cfg.frameHeight;
+  const fw = cfg.frameWidth;
+  const fh = cfg.frameHeight;
 
-    // ⭐ Correct column for 5-wide sheet
-    const col = index % cfg.numFrames;   // numFrames = 5
+  // ⭐ Correct column for 5-wide sheet
+  const col = index % cfg.numFrames; // numFrames = 5
 
-    return cfg.img.get(
-        col * fw + cfg.cropLeft[index],
-        row * fh + cfg.cropTop[index],
-        fw - cfg.cropLeft[index] - cfg.cropRight[index],
-        fh - cfg.cropTop[index] - cfg.cropBottom[index]
-    );
+  return cfg.img.get(
+    col * fw + cfg.cropLeft[index],
+    row * fh + cfg.cropTop[index],
+    fw - cfg.cropLeft[index] - cfg.cropRight[index],
+    fh - cfg.cropTop[index] - cfg.cropBottom[index],
+  );
 }
 
 // Goat movement + animation
 function updateGoat() {
   if (!window.goatDebug) {
-  window.goatDebug = { lastFrame: frameCount, calls: 0 };
-}
+    window.goatDebug = { lastFrame: frameCount, calls: 0 };
+  }
 
-if (frameCount !== window.goatDebug.lastFrame) {
-  console.log("Goat updated", window.goatDebug.calls, "times last frame");
-  window.goatDebug.calls = 0;
-  window.goatDebug.lastFrame = frameCount;
-}
+  if (frameCount !== window.goatDebug.lastFrame) {
+    console.log("Goat updated", window.goatDebug.calls, "times last frame");
+    window.goatDebug.calls = 0;
+    window.goatDebug.lastFrame = frameCount;
+  }
 
-window.goatDebug.calls++;
+  window.goatDebug.calls++;
 
   const cfg = SPRITES.goat;
   const frameDelay = 120; // ms per frame (slow)
@@ -318,62 +317,55 @@ window.goatDebug.calls++;
 
   // movement
   const goatSpeed = 0.4;
-  goatX += (goatDirection === "right") ? goatSpeed : -goatSpeed;
+  goatX += goatDirection === "right" ? goatSpeed : -goatSpeed;
 }
-
 
 // Draw goat inside world transform (fixes jitter)
 function drawGoat() {
-    const cfg = SPRITES.goat;
+  const cfg = SPRITES.goat;
 
-    // Row 0 = RIGHT, Row 1 = LEFT
-    let row = (goatDirection === "right") ? 0 : 1;
+  // Row 0 = RIGHT, Row 1 = LEFT
+  let row = goatDirection === "right" ? 0 : 1;
 
-    const frame = getGoatFrame(goatFrameIndex, row);
+  const frame = getGoatFrame(goatFrameIndex, row);
 
-    push();
-    scale(camZoom * bgScale);
-    translate(-camX, -camY);
+  push();
+  scale(camZoom * bgScale);
+  translate(-camX, -camY);
 
-    image(
-        frame,
-        goatX,
-        goatY,
-        frame.width * cfg.scale,
-        frame.height * cfg.scale
-    );
-    pop();
+  image(frame, goatX, goatY, frame.width * cfg.scale, frame.height * cfg.scale);
+  pop();
 }
 
 // Collision with penguin → loss screen
 function checkGoatCollision() {
-    const penguinHitbox = {
-        x: player.x + PENGUIN_HITBOX.offsetX,
-        y: player.y + PENGUIN_HITBOX.offsetY,
-        w: PENGUIN_HITBOX.w,
-        h: PENGUIN_HITBOX.h
-    };
+  const penguinHitbox = {
+    x: player.x + PENGUIN_HITBOX.offsetX,
+    y: player.y + PENGUIN_HITBOX.offsetY,
+    w: PENGUIN_HITBOX.w,
+    h: PENGUIN_HITBOX.h,
+  };
 
-    const goatHitbox = {
-        x: goatX,
-        y: goatY,
-        w: 120,   // adjust if needed
-        h: 120
-    };
+  const goatHitbox = {
+    x: goatX,
+    y: goatY,
+    w: 120, // adjust if needed
+    h: 120,
+  };
 
-    if (rectOverlap(penguinHitbox, goatHitbox)) {
-        gameState = "loss";
-    }
+  if (rectOverlap(penguinHitbox, goatHitbox)) {
+    gameState = "loss";
+  }
 }
 
 // Rectangle overlap helper
 function rectOverlap(a, b) {
-    return !(
-        a.x + a.w < b.x ||
-        a.x > b.x + b.w ||
-        a.y + a.h < b.y ||
-        a.y > b.y + b.h
-    );
+  return !(
+    a.x + a.w < b.x ||
+    a.x > b.x + b.w ||
+    a.y + a.h < b.y ||
+    a.y > b.y + b.h
+  );
 }
 
 // Main Level 3 goat logic — this is the one actually called from draw().
@@ -403,15 +395,14 @@ function updateLevel3Goat() {
   if (goatHasKilledOnce) {
     // If no goat active, spawn a new one after a random delay
     if (!goatActive && millis() - goatTriggerTime >= goatNextSpawnDelay) {
-
       goatActive = true;
 
       // Random side
       if (random() < 0.5) {
-        goatDirection = "right";      // run right
-        goatX = -200;                 // left side
+        goatDirection = "right"; // run right
+        goatX = -200; // left side
       } else {
-        goatDirection = "left";       // run left
+        goatDirection = "left"; // run left
         goatX = WORLD_W_SCALED + 200; // right side
       }
 
@@ -462,12 +453,30 @@ function updateLevel3Goat() {
     push();
     translate(goatX + frameW * cfg.scale, goatY - frameH * cfg.scale);
     scale(-1, 1);
-    image(cfg.img, 0, 0, frameW * cfg.scale, frameH * cfg.scale, sx, 0, frameW, frameH);
+    image(
+      cfg.img,
+      0,
+      0,
+      frameW * cfg.scale,
+      frameH * cfg.scale,
+      sx,
+      0,
+      frameW,
+      frameH,
+    );
     pop();
   } else {
-    image(cfg.img, goatX, goatY - frameH * cfg.scale,
-          frameW * cfg.scale, frameH * cfg.scale,
-          sx, 0, frameW, frameH);
+    image(
+      cfg.img,
+      goatX,
+      goatY - frameH * cfg.scale,
+      frameW * cfg.scale,
+      frameH * cfg.scale,
+      sx,
+      0,
+      frameW,
+      frameH,
+    );
   }
 
   pop();
@@ -476,7 +485,7 @@ function updateLevel3Goat() {
   // 5) COLLISION WITH PENGUIN
   // -------------------------
   let goatHitX = goatX;
-  let goatHitY = goatY - (frameH * cfg.scale);
+  let goatHitY = goatY - frameH * cfg.scale;
   let goatHitW = frameW * cfg.scale;
   let goatHitH = frameH * cfg.scale;
 
@@ -495,6 +504,7 @@ function updateLevel3Goat() {
 
     gameEnded = true;
     gameState = "loss";
+    if (walkSound && walkSound.isPlaying()) walkSound.stop();
 
     goatHasKilledOnce = true;
     goatActive = false;
@@ -504,5 +514,6 @@ function updateLevel3Goat() {
   // 6) DESPAWN WHEN OFF-SCREEN
   // -------------------------
   if (goatDirection === "left" && goatX < -400) goatActive = false;
-  if (goatDirection === "right" && goatX > WORLD_W_SCALED + 400) goatActive = false;
+  if (goatDirection === "right" && goatX > WORLD_W_SCALED + 400)
+    goatActive = false;
 }

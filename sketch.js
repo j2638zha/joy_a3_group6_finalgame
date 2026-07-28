@@ -1128,6 +1128,7 @@ function updateScreenSounds() {
   if (gameState === "win" && lastScreenSound !== "win") {
     lastScreenSound = "win";
     if (stompSound && stompSound.isPlaying()) stompSound.stop();
+    if (walkSound && walkSound.isPlaying()) walkSound.stop();
     if (winSound && winSound.isLoaded()) winSound.play();
   } else if (gameState === "loss" && lastScreenSound !== "loss") {
     lastScreenSound = "loss";
@@ -1253,6 +1254,7 @@ function draw() {
   // -------------------------
   if (gameEnded) {
     gameState = "loss";
+
     return;
   }
 
@@ -1574,7 +1576,7 @@ function keyPressed() {
   // WIN SCREEN → ENTER → START
   if (gameState === "win" && keyCode === ENTER) {
     playButtonClickSound();
-    gameState = "start";
+    startLevelPickerTransition(); // was: gameState = "start";
     return;
   }
 
@@ -1590,7 +1592,16 @@ function keyPressed() {
   // LOSS SCREEN → ENTER → START
   if (gameState === "loss" && keyCode === ENTER) {
     playButtonClickSound();
-    gameState = "start";
+    resetGame();
+    startTime = millis();
+    timerStarted = true;
+    gameEnded = false;
+    finalTime = null;
+    tutorialActive = false;
+    postTutorialTimerActive = false;
+    tutorialIndex = 999;
+    gameState = "playing";
+    cursor(ARROW);
     return;
   }
 }
@@ -1771,27 +1782,30 @@ function updateWalkSound() {
   if (!walkSound || !walkSound.isLoaded()) return;
   if (!audioUnlocked || getAudioContext().state !== "running") return;
 
-  // Are any movement keys currently held? WASD + arrow keys.
   const movementHeld =
     keyIsDown(87) ||
     keyIsDown(65) ||
     keyIsDown(83) ||
-    keyIsDown(68) || // W A S D
+    keyIsDown(68) ||
     keyIsDown(UP_ARROW) ||
     keyIsDown(DOWN_ARROW) ||
     keyIsDown(LEFT_ARROW) ||
     keyIsDown(RIGHT_ARROW);
 
-  // Only during actual play — never on menus, mid-stomp, or in a hole.
   const onMenu =
     gameState === "start" ||
     gameState === "win" ||
     gameState === "loss" ||
     gameState === "transition" ||
-    gameState === "level_picker";
+    gameState === "level_picker" ||
+    gameState === "story";
 
   const walking =
-    movementHeld && !onMenu && !stompAnimating && holeState === "none";
+    movementHeld &&
+    !onMenu &&
+    !stompAnimating &&
+    holeState === "none" &&
+    !gameEnded; // ← gameEnded guard added
 
   if (walking) {
     if (!walkSound.isPlaying()) {
@@ -2061,13 +2075,16 @@ function checkFishCollision() {
   if (overlap) {
     fish.collected = true;
 
-    // Stop the near-distance loop instantly on collection
-    if (fishCallNear && fishCallNear.isPlaying()) fishCallNear.stop();
-
     // --- COLLECT SOUND ---
     if (fishCollect && fishCollect.isLoaded()) {
       fishCollect.setVolume(0.7);
       fishCollect.play();
+    }
+
+    // --- STOP FISH CALL SOUNDS ---
+    if (fishCallNear && fishCallNear.isPlaying()) fishCallNear.stop();
+    for (const c of fishCallFar) {
+      if (c && c.isPlaying()) c.stop();
     }
 
     // --- NEW POPUP TRIGGER ---

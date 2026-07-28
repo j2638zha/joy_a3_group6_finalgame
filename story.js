@@ -158,6 +158,7 @@ function drawStoryScreen() {
     if (storyFadeToBlack >= 255) {
       storyEntering = false;
       if (storyAudio && storyAudio.isLoaded() && !storyAudio.isPlaying()) {
+        storyAudio.setVolume(3);
         storyAudio.play();
       }
     }
