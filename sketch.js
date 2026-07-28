@@ -2379,7 +2379,7 @@ function drawBlizzardOverlay() {
 
   // Full white blizzard layer
   blizzardBuffer.noStroke();
-  blizzardBuffer.fill(255, 255, 255, 200); // change opacity back to 253 after debugging
+  blizzardBuffer.fill(255, 255, 255, 253); // change opacity back to 253 after debugging
   blizzardBuffer.rect(0, 0, width, height);
 
   // Convert penguin world → screen

@@ -1,8 +1,8 @@
 //level_picker.js file
 
 let infoOpen = false;
-const INFO_CLOSED_X = -1100;  // off screen left
-const INFO_OPEN_X = 100;      // where box stops
+const INFO_CLOSED_X = -1100; // off screen left
+const INFO_OPEN_X = 100; // where box stops
 const INFO_SPEED = 50;
 let infoBoxX = INFO_CLOSED_X;
 
@@ -11,18 +11,36 @@ let currentLevel = 1;
 let lock_icon;
 let check_icon;
 let info_box;
-let level1Complete = true;
-let level2Complete = true;
-let level3Complete = true;
+let level1Complete = false;
+let level2Complete = false;
+let level3Complete = false;
 
 let levelShake = [0, 0, 0];
 const PANEL_CLOSED_X = 1600;
-const PANEL_OPEN_X   = 700;
-const PANEL_SPEED    = 0.35;
+const PANEL_OPEN_X = 700;
+const PANEL_SPEED = 0.35;
 let levelPanels = [
-  { title: "Rocky Range", starScore: "--", recordTime: "...", x: PANEL_CLOSED_X, targetX: PANEL_CLOSED_X },
-  { title: "Frozen Fissures", starScore: "--", recordTime: "...", x: PANEL_CLOSED_X, targetX: PANEL_CLOSED_X },
-  { title: "Ram Ridge", starScore: "--", recordTime: "...", x: PANEL_CLOSED_X, targetX: PANEL_CLOSED_X }
+  {
+    title: "Rocky Range",
+    starScore: "--",
+    recordTime: "...",
+    x: PANEL_CLOSED_X,
+    targetX: PANEL_CLOSED_X,
+  },
+  {
+    title: "Frozen Fissures",
+    starScore: "--",
+    recordTime: "...",
+    x: PANEL_CLOSED_X,
+    targetX: PANEL_CLOSED_X,
+  },
+  {
+    title: "Ram Ridge",
+    starScore: "--",
+    recordTime: "...",
+    x: PANEL_CLOSED_X,
+    targetX: PANEL_CLOSED_X,
+  },
 ];
 
 let activePanelIndex = -1;
@@ -42,66 +60,69 @@ function preloadLevelPickerAssets() {
 }
 
 function drawLevelPickerScreen() {
-    cursor(ARROW);
-    image(levelPickerBg, 0, 0, width, height);
+  cursor(ARROW);
+  image(levelPickerBg, 0, 0, width, height);
 
-    textFont(gameFont);
-    textAlign(CENTER);
-    fill(255);
-    stroke(10, 15, 54);
-    strokeWeight(8);
-    textSize(80);
-    text("Select a Level", width / 2 - 20, 70);
+  textFont(gameFont);
+  textAlign(CENTER);
+  fill(255);
+  stroke(10, 15, 54);
+  strokeWeight(8);
+  textSize(80);
+  text("Select a Level", width / 2 - 20, 70);
 
-    let cx1 = 570, cy1 = 155;
-    let cx2 = 565, cy2 = 395;
-    let cx3 = 531, cy3 = 622;
+  let cx1 = 570,
+    cy1 = 155;
+  let cx2 = 565,
+    cy2 = 395;
+  let cx3 = 531,
+    cy3 = 622;
 
-    let diameter = 73;
-    let radius = diameter / 2;
+  let diameter = 73;
+  let radius = diameter / 2;
 
-    drawLevelCircle(cx1, cy1, radius, true, 0);
-    drawLevelCircle(cx2, cy2, radius, level1Complete, 1);
-    drawLevelCircle(cx3, cy3, radius, level2Complete, 2);
-    
-    for (let i = 0; i < levelPanels.length; i++) {
-        let key = "level" + (i + 1);   // level1, level2, level3
-        levelPanels[i].recordTime = formatTime(fastestTimes[key]);
+  drawLevelCircle(cx1, cy1, radius, true, 0);
+  drawLevelCircle(cx2, cy2, radius, level1Complete, 1);
+  drawLevelCircle(cx3, cy3, radius, level2Complete, 2);
+
+  for (let i = 0; i < levelPanels.length; i++) {
+    let key = "level" + (i + 1); // level1, level2, level3
+    levelPanels[i].recordTime = formatTime(fastestTimes[key]);
+  }
+
+  for (let i = 0; i < levelPanels.length; i++) {
+    // decide target based on state
+    if (isClosingPanel && i === activePanelIndex) {
+      levelPanels[i].targetX = PANEL_CLOSED_X; // force current to close
+    } else if (i === activePanelIndex) {
+      levelPanels[i].targetX = PANEL_OPEN_X; // open active
+    } else {
+      levelPanels[i].targetX = PANEL_CLOSED_X; // others closed
     }
+    let dx = levelPanels[i].targetX - levelPanels[i].x;
+    let step = 50; // adjust to taste
 
-    for (let i = 0; i < levelPanels.length; i++) {
-        // decide target based on state
-        if (isClosingPanel && i === activePanelIndex) {
-            levelPanels[i].targetX = PANEL_CLOSED_X;   // force current to close
-        } else if (i === activePanelIndex) {
-            levelPanels[i].targetX = PANEL_OPEN_X;     // open active
-        } else {
-            levelPanels[i].targetX = PANEL_CLOSED_X;   // others closed
-        }
-        let dx = levelPanels[i].targetX - levelPanels[i].x;
-        let step = 50; // adjust to taste
-
-        if (Math.abs(dx) < step) {
-            levelPanels[i].x = levelPanels[i].targetX;
-        } else {
-            levelPanels[i].x += Math.sign(dx) * step;
-        }
-        drawInfoPanel(i);
+    if (Math.abs(dx) < step) {
+      levelPanels[i].x = levelPanels[i].targetX;
+    } else {
+      levelPanels[i].x += Math.sign(dx) * step;
     }
+    drawInfoPanel(i);
+  }
 
-    // after movement, check if closing finished
-    if (isClosingPanel && activePanelIndex !== -1) {
-        let panel = levelPanels[activePanelIndex];
-        if (Math.abs(panel.x - PANEL_CLOSED_X) < 1) {
-            // fully closed → switch to next panel
-            activePanelIndex = nextPanelIndex;
-            nextPanelIndex = -1;
-            isClosingPanel = false;
-        }
+  // after movement, check if closing finished
+  if (isClosingPanel && activePanelIndex !== -1) {
+    let panel = levelPanels[activePanelIndex];
+    if (Math.abs(panel.x - PANEL_CLOSED_X) < 1) {
+      // fully closed → switch to next panel
+      activePanelIndex = nextPanelIndex;
+      nextPanelIndex = -1;
+      isClosingPanel = false;
     }
+  }
 
-    drawObjectiveInfoButton();
-    drawObjectiveInfoBox();
+  drawObjectiveInfoButton();
+  drawObjectiveInfoBox();
 }
 
 function drawLevelCircle(cx, cy, radius, unlocked, index) {
@@ -129,7 +150,7 @@ function drawLevelCircle(cx, cy, radius, unlocked, index) {
 
   // --- CHECKMARK FOR COMPLETED LEVELS ---
   let levelKey = "level" + (index + 1);
-  if (bestStars[levelKey] >= 1)  {
+  if (bestStars[levelKey] >= 1) {
     // Draw checkmark slightly to the right of the circle
     let checkX = cx + radius - 42;
     let checkY = cy - radius + 25;
@@ -142,101 +163,101 @@ function drawLevelCircle(cx, cy, radius, unlocked, index) {
 }
 
 function drawInfoPanel(index) {
-    let panel = levelPanels[index];
-    let x = panel.x;
-    let y = 175;
-    const PANEL_W = 500;
-    const PANEL_H = 500;
+  let panel = levelPanels[index];
+  let x = panel.x;
+  let y = 175;
+  const PANEL_W = 500;
+  const PANEL_H = 500;
 
-    image(info_box, x, y, PANEL_W, PANEL_H);
+  image(info_box, x, y, PANEL_W, PANEL_H);
 
-    let centerX = x + PANEL_W / 2;
-    fill(255);
-    noStroke();
-    textFont(gameFont);
-    textAlign(CENTER, CENTER);
+  let centerX = x + PANEL_W / 2;
+  fill(255);
+  noStroke();
+  textFont(gameFont);
+  textAlign(CENTER, CENTER);
 
-    textSize(60);
-    text(panel.title, centerX, y + 80);
+  textSize(60);
+  text(panel.title, centerX, y + 80);
 
-    textSize(46);
-    text("Level " + (index+1), centerX, y + 130);
+  textSize(46);
+  text("Level " + (index + 1), centerX, y + 130);
 
-    // --- DRAW STARS ---
-    let startX = x + 108;     // horizontal starting point
-    let starY  = y + 160;     // vertical base position
-    let starW  = 120;
-    let starH  = 120;     
-    const drawOrder = [0, 2, 1];
+  // --- DRAW STARS ---
+  let startX = x + 108; // horizontal starting point
+  let starY = y + 160; // vertical base position
+  let starW = 120;
+  let starH = 120;
+  const drawOrder = [0, 2, 1];
 
-    for (let i = 0; i < 3; i++) {
-        let starIndex = drawOrder[i];   // remap logical star index
+  for (let i = 0; i < 3; i++) {
+    let starIndex = drawOrder[i]; // remap logical star index
 
-        let sx = startX + i * 82;
-        let yOffset = (i === 1) ? -10 : 0; // middle star visually higher
+    let sx = startX + i * 82;
+    let yOffset = i === 1 ? -10 : 0; // middle star visually higher
 
-        if (starIndex < bestStars["level" + (index + 1)]) {
-            image(starFilledImg, sx, starY + yOffset, starW, starH);
-        } else {
-            image(starOutlineImg, sx, starY + yOffset, starW, starH);
-        }
+    if (starIndex < bestStars["level" + (index + 1)]) {
+      image(starFilledImg, sx, starY + yOffset, starW, starH);
+    } else {
+      image(starOutlineImg, sx, starY + yOffset, starW, starH);
     }
+  }
 
-
-    // --- DRAW FASTEST TIME ---
-    let key = "level" + (index + 1);
-    let fastest = fastestTimes[key];
-    let fastestText = (fastest === null)
+  // --- DRAW FASTEST TIME ---
+  let key = "level" + (index + 1);
+  let fastest = fastestTimes[key];
+  let fastestText =
+    fastest === null
       ? "--:--"
       : floor(fastest / 60) + ":" + nf(fastest % 60, 2);
 
-    // store into panel so your existing text() calls work
-    panel.recordTime = fastestText;
-    textSize(38);
-    text("Fastest Descent:", centerX, y + 280);
-    textSize(68);
-    text(panel.recordTime, centerX, y + 320);
+  // store into panel so your existing text() calls work
+  panel.recordTime = fastestText;
+  textSize(38);
+  text("Fastest Descent:", centerX, y + 280);
+  textSize(68);
+  text(panel.recordTime, centerX, y + 320);
 
-    let btnX = x + PANEL_W/2;
-    let btnY = y + PANEL_H - 100;
+  let btnX = x + PANEL_W / 2;
+  let btnY = y + PANEL_H - 100;
 
-    // get hover from ENTER button
-    let hovered = drawButton("ENTER", btnX, btnY, 220, 60, playBtnPressed[index]);
+  // get hover from ENTER button
+  let hovered = drawButton("ENTER", btnX, btnY, 220, 60, playBtnPressed[index]);
 
-    // store hover if you need it later
-    levelPanels[index].playHover = hovered;
+  // store hover if you need it later
+  levelPanels[index].playHover = hovered;
 
-    // 🔹 make cursor a pointer when ENTER is hovered
-    if (hovered) {
-      cursor(HAND);
-    }
+  // 🔹 make cursor a pointer when ENTER is hovered
+  if (hovered) {
+    cursor(HAND);
+  }
 }
 
 function handleLevelPickerClick() {
+  let infoBtnX = 25;
+  let infoBtnY = 25;
+  let infoBtnSize = 70;
 
-let infoBtnX = 25;
-let infoBtnY = 25;
-let infoBtnSize = 70;
-
-if (mouseX > infoBtnX && mouseX < infoBtnX + infoBtnSize &&
-    mouseY > infoBtnY && mouseY < infoBtnY + infoBtnSize) {
-  playButtonClickSound();
-  infoOpen = !infoOpen;
-  return;
-}
+  if (
+    mouseX > infoBtnX &&
+    mouseX < infoBtnX + infoBtnSize &&
+    mouseY > infoBtnY &&
+    mouseY < infoBtnY + infoBtnSize
+  ) {
+    playButtonClickSound();
+    infoOpen = !infoOpen;
+    return;
+  }
 
   let cx = [570, 565, 531];
   let cy = [158, 405, 640];
   let radius = 73 / 2;
 
   for (let i = 0; i < 3; i++) {
-    let unlocked = (i === 0) ? true
-                  : (i === 1) ? level1Complete
-                  : level2Complete;
+    let unlocked = i === 0 ? true : i === 1 ? level1Complete : level2Complete;
 
     let d = dist(mouseX, mouseY, cx[i], cy[i]);
     if (d < radius) {
-
       if (!unlocked) {
         playButtonClickSound();
         levelShake[i] = 10;
@@ -271,21 +292,21 @@ if (mouseX > infoBtnX && mouseX < infoBtnX + infoBtnSize &&
 
 function startLevel(i) {
   if (i === 0) {
-    startLevel1();   // Level 1 uses tutorial
+    startLevel1(); // Level 1 uses tutorial
     return;
   }
 
-  currentLevel = i + 1;      // 2 for Level 2, 3 for Level 3
-  loadLevel(currentLevel);   // build that level's background/walls/spikes/fish
+  currentLevel = i + 1; // 2 for Level 2, 3 for Level 3
+  loadLevel(currentLevel); // build that level's background/walls/spikes/fish
   resetGame();
 
   if (currentLevel === 2) {
-    startLevel2Intro();      // show avalanche + crevices cards before Level 2 begins
+    startLevel2Intro(); // show avalanche + crevices cards before Level 2 begins
     return;
   }
 
   if (currentLevel === 3) {
-    startLevel3Intro();      // show avalanche card before Level 3 begins
+    startLevel3Intro(); // show avalanche card before Level 3 begins
     return;
   }
 
@@ -294,21 +315,21 @@ function startLevel(i) {
 }
 
 function startLevel1() {
-loadLevel(1);
-resetGame();          // resets timer, penguin, stomp, etc.
-gameState = "tutorial";
-tutorialActive = true;
-tutorialAlpha = 0;
-tutorialIndex = 0;
-tutorialDelay = tutorialSteps[0].delay;
+  loadLevel(1);
+  resetGame(); // resets timer, penguin, stomp, etc.
+  gameState = "tutorial";
+  tutorialActive = true;
+  tutorialAlpha = 0;
+  tutorialIndex = 0;
+  tutorialDelay = tutorialSteps[0].delay;
 }
 
 // For fastest times
 function formatTime(t) {
-    if (t === null) return "--:--";
-    let minutes = floor(t / 60);
-    let seconds = t % 60;
-    return minutes + ":" + nf(seconds, 2);
+  if (t === null) return "--:--";
+  let minutes = floor(t / 60);
+  let seconds = t % 60;
+  return minutes + ":" + nf(seconds, 2);
 }
 
 function drawObjectiveInfoButton() {
@@ -318,8 +339,12 @@ function drawObjectiveInfoButton() {
 
   image(infoButtonImg, btnX, btnY, btnSize, btnSize);
 
-  if (mouseX > btnX && mouseX < btnX + btnSize &&
-      mouseY > btnY && mouseY < btnY + btnSize) {
+  if (
+    mouseX > btnX &&
+    mouseX < btnX + btnSize &&
+    mouseY > btnY &&
+    mouseY < btnY + btnSize
+  ) {
     cursor(HAND);
   }
 }
@@ -360,7 +385,7 @@ function drawObjectiveInfoBox() {
   text(
     "On your way down the mountain, you must find fishy \nwithin the time limit to get to the next level.",
     centerX,
-    boxY + 230
+    boxY + 230,
   );
 
   image(fishImg, centerX - 40, boxY + 280, 70, 40);
@@ -369,7 +394,7 @@ function drawObjectiveInfoBox() {
   text(
     "Find fishy as fast as possible to collect 3 stars.\nYou need to collect stars to unlock levels.",
     centerX,
-    boxY + 370
+    boxY + 370,
   );
 
   // 1 star row
