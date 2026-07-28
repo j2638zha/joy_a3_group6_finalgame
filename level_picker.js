@@ -11,9 +11,9 @@ let currentLevel = 1;
 let lock_icon;
 let check_icon;
 let info_box;
-let level1Complete = false;
-let level2Complete = false;
-let level3Complete = false;
+let level1Complete = true;
+let level2Complete = true;
+let level3Complete = true;
 
 let levelShake = [0, 0, 0];
 const PANEL_CLOSED_X = 1600;
@@ -220,6 +220,7 @@ let infoBtnSize = 70;
 
 if (mouseX > infoBtnX && mouseX < infoBtnX + infoBtnSize &&
     mouseY > infoBtnY && mouseY < infoBtnY + infoBtnSize) {
+  playButtonClickSound();
   infoOpen = !infoOpen;
   return;
 }
@@ -237,12 +238,15 @@ if (mouseX > infoBtnX && mouseX < infoBtnX + infoBtnSize &&
     if (d < radius) {
 
       if (!unlocked) {
+        playButtonClickSound();
         levelShake[i] = 10;
         activePanelIndex = -1;
         isClosingPanel = false;
         nextPanelIndex = -1;
         return;
       }
+
+      playButtonClickSound();
 
       if (activePanelIndex === i) {
         activePanelIndex = -1;
@@ -274,6 +278,17 @@ function startLevel(i) {
   currentLevel = i + 1;      // 2 for Level 2, 3 for Level 3
   loadLevel(currentLevel);   // build that level's background/walls/spikes/fish
   resetGame();
+
+  if (currentLevel === 2) {
+    startLevel2Intro();      // show avalanche + crevices cards before Level 2 begins
+    return;
+  }
+
+  if (currentLevel === 3) {
+    startLevel3Intro();      // show avalanche card before Level 3 begins
+    return;
+  }
+
   gameState = "playing";
   cursor(ARROW);
 }

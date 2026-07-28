@@ -14,6 +14,50 @@ const LEVEL3_HOLES = [
   { x: 633, y: 459},
 ]
 
+let avalancheCard3;
+let goatCard;
+let level3CardActive = false;
+let level3CardStep = 0;
+
+
+function preloadLevel3Assets() {
+  avalancheCard3 = loadImage("assets/images/avalanche_card3.png");
+  goatCard = loadImage("assets/images/goat_card.png");
+}
+
+function startLevel3Intro() {
+  level3CardActive = true;
+  level3CardStep = 0;
+  gameState = "level3_card";
+}
+
+// ENTER dismisses the card and hands control back to normal gameplay.
+function handleLevel3CardKeyPressed() {
+  if (gameState !== "level3_card" || keyCode !== ENTER) return false;
+
+  level3CardStep++;
+
+  if (level3CardStep >= 2) {
+    // both cards have been dismissed — start gameplay
+    level3CardActive = false;
+    gameState = "playing";
+    cursor(ARROW);
+  } else {
+    playCardSwitchSound(); // same sound used when tutorial/level2 cards advance
+  }
+
+  return true;
+}
+
+// Draws the card — reuses drawDialogueCard() already defined in tutorial_cards.js
+function drawLevel3CardOverlay() {
+  if (level3CardStep === 0) {
+    drawDialogueCard(avalancheCard3);
+  } else if (level3CardStep === 1) {
+    drawDialogueCard(goatCard);
+  }
+}
+
 function getLevel3FishStart(WORLD_W_SCALED, WORLD_H_SCALED) {
   return {
     x: WORLD_W_SCALED / 2,
@@ -229,8 +273,9 @@ let goatDirection = "left";
 let goatHasKilledOnce = false;   // has the tutorial kill already happened?
 let goatTriggered = false;       // generic “run across screen” trigger
 let goatTriggerTime = 0;         // when we started the countdown
-let goatSpeed = 6;               // movement speed
+let goatSpeed = 4;               // movement speed
 let goatNextSpawnDelay = 3000;  // first retry goat comes after 3s
+let goatFrameTimer = 0;
 
 // Get a goat frame from the correct row (0 = left, 1 = right)
 function getGoatFrame(index, row) {
@@ -252,22 +297,30 @@ function getGoatFrame(index, row) {
 
 // Goat movement + animation
 function updateGoat() {
-    // Use correct frame count (4 frames per row)
-    let cfg = (goatDirection === "left") ? SPRITES.goat_left : SPRITES.goat_right;
-    if (frameCount % SPRITES.goat.animSpeed === 0) {
-    goatFrameIndex = (goatFrameIndex + 1) % SPRITES.goat.numFrames;
+  if (!window.goatDebug) {
+  window.goatDebug = { lastFrame: frameCount, calls: 0 };
 }
 
-    // Move goat
-  const goatSpeed = 0.8;   // slow enough to see each frame clearly
-
-if (goatDirection === "right") {
-    goatX += goatSpeed;
-} else {
-    goatX -= goatSpeed;
+if (frameCount !== window.goatDebug.lastFrame) {
+  console.log("Goat updated", window.goatDebug.calls, "times last frame");
+  window.goatDebug.calls = 0;
+  window.goatDebug.lastFrame = frameCount;
 }
 
+window.goatDebug.calls++;
+
+  const cfg = SPRITES.goat;
+  const frameDelay = 120; // ms per frame (slow)
+  if (millis() - goatStartTime > frameDelay) {
+    goatStartTime = millis();
+    goatFrameIndex = (goatFrameIndex + 1) % cfg.numFrames;
+  }
+
+  // movement
+  const goatSpeed = 0.4;
+  goatX += (goatDirection === "right") ? goatSpeed : -goatSpeed;
 }
+
 
 // Draw goat inside world transform (fixes jitter)
 function drawGoat() {
@@ -339,6 +392,8 @@ function updateLevel3Goat() {
       goatX = WORLD_W_SCALED + 200;
       goatY = player.y;
 
+      if (goatSound && goatSound.isLoaded()) goatSound.play();
+
       // prevent repeat
       goatTriggered = false;
     }
@@ -363,6 +418,8 @@ function updateLevel3Goat() {
       // Random Y anywhere on mountain
       goatY = random(200, WORLD_H_SCALED - 200);
 
+      if (goatSound && goatSound.isLoaded()) goatSound.play();
+
       // Set next spawn delay (2–5 seconds)
       goatNextSpawnDelay = random(800, 1800);
       goatTriggerTime = millis();
@@ -383,7 +440,11 @@ function updateLevel3Goat() {
   // -------------------------
   // 3) ANIMATE GOAT
   // -------------------------
-  goatFrameIndex = (goatFrameIndex + 1) % SPRITES.goat.numFrames;
+  goatFrameTimer++;
+  if (goatFrameTimer >= SPRITES.goat.animSpeed) {
+    goatFrameTimer = 0;
+    goatFrameIndex = (goatFrameIndex + 1) % SPRITES.goat.numFrames;
+  }
 
   // -------------------------
   // 4) DRAW GOAT (with flip)
@@ -430,6 +491,8 @@ function updateLevel3Goat() {
     goatHitY < penguinHitY + penguinHitH &&
     goatHitY + goatHitH > penguinHitY
   ) {
+    if (goatSound && goatSound.isLoaded()) goatSound.play();
+
     gameEnded = true;
     gameState = "loss";
 

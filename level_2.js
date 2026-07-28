@@ -31,8 +31,48 @@ const LEVEL2_FISH_SPAWNS = [
     { x: 87, y: 1180},
 ];
 
+let avalancheCard2;
+let crevicesCard;
+let level2CardActive = false;
+let level2CardStep = 0;
+
 function preloadLevel2Assets() {
   hole = loadImage("assets/images/crevice.png");
+  avalancheCard2 = loadImage("assets/images/avalanche_card2.png");
+  crevicesCard = loadImage("assets/images/crevices_card.png");
+}
+
+function startLevel2Intro() {
+  level2CardActive = true;
+  level2CardStep = 0;
+  gameState = "level2_card";
+}
+
+// ENTER dismisses the card and hands control back to normal gameplay.
+function handleLevel2CardKeyPressed() {
+  if (gameState !== "level2_card" || keyCode !== ENTER) return false;
+
+  level2CardStep++;
+
+  if (level2CardStep >= 2) {
+    // both cards have been dismissed — start gameplay
+    level2CardActive = false;
+    gameState = "playing";
+    cursor(ARROW);
+  } else {
+    playCardSwitchSound(); // same sound used when tutorial cards advance
+  }
+
+  return true;
+}
+
+// Draws the card — reuses drawDialogueCard() already defined in tutorial_cards.js
+function drawLevel2CardOverlay() {
+  if (level2CardStep === 0) {
+    drawDialogueCard(avalancheCard2);
+  } else if (level2CardStep === 1) {
+    drawDialogueCard(crevicesCard);
+  }
 }
 
 // Where the fish first appears when Level 2 loads.
@@ -113,10 +153,12 @@ const LEVEL2_SPIKES = [
  { x: 70, y: 1300, variant: 1 },
  { x: 106, y: 1300, variant: 1 },
  { x: 142, y: 1300, variant: 1 },
- { x: 1049, y: 1144, variant: 1 },
- { x: 1016, y: 1162, variant: 1 },
- { x: 991, y: 1188, variant: 1 },
- { x: 949, y: 1208, variant: 1 },
+ 
+ { x: 1049, y: 1100, variant: 1 },
+ { x: 1016, y: 1100, variant: 1 },
+ { x: 991, y: 1100, variant: 1 },
+ { x: 949, y: 1100, variant: 1 },
+
  { x: 911, y: 795, variant: 2 },
  { x: 876, y: 839, variant: 2 },
  { x: 851, y: 871, variant: 2 },

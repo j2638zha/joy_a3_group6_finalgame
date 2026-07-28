@@ -15,7 +15,10 @@ let levelPickerBg;
 let introMusic;
 let gameMusic;
 let fishCollect;
-let fishCallFar = []; // "searching" clips, alternate when fish is far
+let goatSound;
+let timerSound;
+let buttonClickSound;
+let fishCallFar = []; // "searching" clips — [0] = "come find me", [1] = "I'm here"
 let fishCallNear; // plays when penguin is close
 let winSound;
 let loseSound;
@@ -90,7 +93,7 @@ const HOLE_TIMER_FLASH_FRAMES = 240; // 4 seconds @ 60fps red/white flash on the
 // separately here as a fraction of that visual size, so you can make the
 // hole look one size but have a tighter/looser trigger radius.
 const HOLE_VISUAL_SCALE = 0.5;
-const HOLE_TRIGGER_RADIUS_FACTOR = 0.38; // fraction of hole width used as the fall-in radius
+const HOLE_HITBOX_SCALE = 0.47;
 
 // Fall/climb penguin animation size is controlled INDEPENDENTLY of the hole,
 // via SPRITES.fall.scale and SPRITES.climb.scale below. If the falling/
@@ -246,8 +249,8 @@ const SPRITES = {
     frameWidth: 248, // 247–248 is correct
     frameHeight: 248, // 247–248 is correct
     numFrames: 5, // 5 columns
-    animSpeed: 20,
-    scale: 0.3,
+    animSpeed: 8,
+    scale: 0.4,
 
     cropLeft: [10, 15, 20, 15, 10],
     cropRight: [10, 15, 20, 15, 10],
@@ -318,7 +321,7 @@ let player = {
 // TIMER
 let totalTime = 10;
 const LEVEL_TIMES = {
-  1: 210,
+  1: 209,
   2: 180,
   3: 150,
 };
@@ -349,6 +352,14 @@ function playerSpawnY() {
   const idleH =
     (cfg.frameHeight - cfg.cropTop[0] - cfg.cropBottom[0]) * cfg.scale;
   return WORLD_H_SCALED - idleH / 2;
+}
+
+// Plays the shared button-click sound. Called from any button/key press
+// across the game (level picker, win/loss screens, restart, etc.).
+function playButtonClickSound() {
+  if (buttonClickSound && buttonClickSound.isLoaded()) {
+    buttonClickSound.play();
+  }
 }
 
 // Builds the world (background, walls, spikes, fish) for whichever
@@ -439,8 +450,10 @@ const PENGUIN_HITBOX = {
   offsetY: -35, // because the sprite is now anchored at the feet
 };
 
-let DEBUG_PENGUIN_HITBOX = false; // remove after debugging
-let DEBUG_SHOW_COORDS = true; // shows player x,y on screen - use this to find coordinates for your new levels. Set to false when done building.
+let DEBUG_PENGUIN_HITBOX = false;
+let DEBUG_SHOW_COORDS = false;
+let DEBUG_HOLE_HITBOXES = false;
+let DEBUG_GOAT_HITBOX = false;
 
 let clearRadius = 100; // circle width
 let holeOffsetX = -3;
@@ -472,6 +485,7 @@ let ringOffsetX = 0;
 let ringOffsetY = -50;
 let stompOffsetX = -5;
 let stompOffsetY = 0;
+let blockFishSounds = false;
 
 // ROCKY SPIKES — generic hitbox/image config. Per-level spike
 // PLACEMENT (the x/y/variant list) lives in level_1.js etc, and
@@ -550,9 +564,14 @@ function preload() {
   winBg = loadImage("assets/images/win_screen.png");
   lossBg = loadImage("assets/images/loss_screen.png");
   transitionPage = loadImage("assets/images/transition_page.png");
+
+  // SOUNDS
   introMusic = loadSound("assets/sounds/introscreen.mp3");
   gameMusic = loadSound("assets/sounds/game_background_music.mp3");
   fishCollect = loadSound("assets/sounds/fish_collect_sound.mp3");
+  goatSound = loadSound("assets/sounds/goat_sound.mp3");
+  timerSound = loadSound("assets/sounds/timer_sound.mp3");
+  buttonClickSound = loadSound("assets/sounds/button_click_sound.mp3");
   fishCallFar[0] = loadSound("assets/sounds/shelby_comefindme.mp3");
   fishCallFar[1] = loadSound("assets/sounds/shelby_imhere.mp3");
   fishCallNear = loadSound("assets/sounds/shelby_imnearyou.mp3");
@@ -566,6 +585,7 @@ function preload() {
   preloadTutorialAssets();
   preloadLevelPickerAssets();
   preloadLevel2Assets();
+  preloadLevel3Assets();
 
   // Fishy stuff
   fishImg = loadImage("assets/images/test_fish.png");
@@ -680,6 +700,54 @@ function drawPenguinHitbox() {
   stroke(0, 255, 0);
   strokeWeight(3);
   rect(screenX, screenY, hw * scale, hh * scale);
+  pop();
+}
+
+function drawHoleHitboxes() {
+  if (!DEBUG_HOLE_HITBOXES) return;
+  if (!hole) return;
+
+  const scale = camZoom * bgScale;
+
+  const hw = hole.width * HOLE_VISUAL_SCALE * HOLE_HITBOX_SCALE;
+  const hh = hole.height * HOLE_VISUAL_SCALE * HOLE_HITBOX_SCALE;
+
+  push();
+  noFill();
+  stroke(255, 0, 255); // magenta = collision hitbox
+  strokeWeight(3 / scale);
+
+  for (const h of holes) {
+    const hx = h.x - hw / 2;
+    const hy = h.y - hh / 2;
+
+    const sx = (hx - camX) * scale;
+    const sy = (hy - camY) * scale;
+
+    rect(sx, sy, hw * scale, hh * scale);
+  }
+
+  pop();
+}
+
+function drawGoatHitbox() {
+  if (!DEBUG_GOAT_HITBOX) return;
+
+  const cfg = SPRITES.goat;
+  const scale = cfg.scale * camZoom * bgScale;
+
+  const w = (cfg.frameWidth - cfg.cropLeft[0] - cfg.cropRight[0]) * scale;
+  const h = (cfg.frameHeight - cfg.cropTop[0] - cfg.cropBottom[0]) * scale;
+
+  // Convert world → screen (same as penguin)
+  const sx = (goatX - camX) * camZoom * bgScale - w / 2;
+  const sy = (goatY - camY) * camZoom * bgScale - h / 2;
+
+  push();
+  noFill();
+  stroke(255, 0, 255); // magenta
+  strokeWeight(3);
+  rect(sx, sy, w, h);
   pop();
 }
 
@@ -967,53 +1035,91 @@ function unlockAudio() {
       /* no gesture yet — a later event will retry */
     });
 }
-// Fish calls — pings every few seconds, louder the closer the penguin is.
-// Far away: alternates between the two "searching" clips.
-// Close: switches to the dedicated "I'm near you" clip.
+
+// ------------------------------------------------------------
+// FISH SOUND SYSTEM
+// ------------------------------------------------------------
+// fishCallFar[0] "come find me"  → played once during the 2nd tutorial card
+//                                  (hook still pending — see note below)
+// fishCallFar[1] "I'm here"      → played once after the stomp sound ends,
+//                                  then fades out (playStompFishCall)
+// fishCallNear   "I'm near you"  → loops every 10s while the penguin is
+//                                  within FISH_NEAR_DIST of the fish,
+//                                  stops the instant the fish is collected
 const FISH_CALL_MAX_VOL = 0.8;
-const FISH_CALL_MIN_VOL = 0.1;
-const FISH_CALL_FALLOFF = 900; // distance at which pings are quietest
-const FISH_CALL_INTERVAL = 6000; // ms between pings
 const FISH_NEAR_DIST = 250; // within this distance → "I'm near you"
+const FISH_NEAR_LOOP_INTERVAL = 10000; // ms between "I'm near you" loops
+const STOMP_FISHCALL_FADE_SEC = 1; // how long the post-stomp ping fades out
 
-let lastFishCallTime = 0;
-let farCallIndex = 0; // which "searching" clip plays next
+let lastNearCallTime = 0;
+let comeFindMePlayed = false; // guards fishCallFar[0] so it only fires once per attempt
 
+// Plays fishCallFar[0] ("come find me") once, the first time the penguin
+// is standing on the 3rd tutorial card (tutorialIndex === 2, 0-indexed).
+function updateTutorialComeFindMeSound() {
+  if (!audioUnlocked || getAudioContext().state !== "running") return;
+  if (!tutorialActive || tutorialIndex !== 1 || comeFindMePlayed) return;
+
+  comeFindMePlayed = true;
+  const clip = fishCallFar[0];
+  if (clip && clip.isLoaded()) {
+    clip.setVolume(FISH_CALL_MAX_VOL);
+    clip.play();
+  }
+}
+
+// Fired once the stomp sound finishes playing (see handleInput()).
+function playStompFishCall() {
+  if (!blockFishSounds) return; // stomp already ended, don't fire late
+  const clip = fishCallFar[1]; // "shelby_imhere.mp3"
+  if (!clip || !clip.isLoaded()) return;
+
+  clip.setVolume(FISH_CALL_MAX_VOL);
+  clip.play();
+
+  const fadeDelayMs = max(0, clip.duration() - STOMP_FISHCALL_FADE_SEC) * 1000;
+  setTimeout(() => {
+    if (clip.isPlaying()) {
+      clip.setVolume(0, STOMP_FISHCALL_FADE_SEC);
+    }
+  }, fadeDelayMs);
+}
+
+// TODO: hook up fishCallFar[0] ("come find me") to play once during the
+// SECOND tutorial card. Not wired up yet — need the exact variable/value
+// from tutorial_cards.js that means "card 2 is showing" (e.g. a specific
+// tutorialIndex value) so this doesn't reference something undefined.
+// Once you share that, the call goes here or in tutorial_cards.js:
+//   if (fishCallFar[0] && fishCallFar[0].isLoaded()) fishCallFar[0].play();
+
+// Loops "I'm near you" every FISH_NEAR_LOOP_INTERVAL ms while the penguin
+// is within FISH_NEAR_DIST of the fish. Stops automatically once the fish
+// is collected (checked here) and also stopped explicitly in
+// checkFishCollision() so it can't linger mid-play.
 function updateFishCall() {
   if (!audioUnlocked || getAudioContext().state !== "running") return;
+  if (fish.collected) return;
+  if (blockFishSounds) return; // don't overlap with the stomp's "I'm here" call
 
   const playing =
     gameState !== "start" &&
     gameState !== "win" &&
     gameState !== "loss" &&
     gameState !== "transition" &&
-    gameState !== "level_picker" &&
-    !fish.collected;
+    gameState !== "level_picker";
 
   if (!playing) return;
 
-  if (millis() - lastFishCallTime < FISH_CALL_INTERVAL) return;
-  lastFishCallTime = millis();
-
   const d = dist(player.x, player.y, fish.x, fish.y);
+  if (d >= FISH_NEAR_DIST) return; // only loops while inside the threshold
 
-  // Pick the clip: near → dedicated clip, far → alternate the two searching ones.
-  let clip;
-  if (d < FISH_NEAR_DIST) {
-    clip = fishCallNear;
-  } else {
-    clip = fishCallFar[farCallIndex];
-    farCallIndex = (farCallIndex + 1) % fishCallFar.length; // take turns
+  if (millis() - lastNearCallTime < FISH_NEAR_LOOP_INTERVAL) return;
+  lastNearCallTime = millis();
+
+  if (fishCallNear && fishCallNear.isLoaded()) {
+    fishCallNear.setVolume(FISH_CALL_MAX_VOL);
+    fishCallNear.play();
   }
-
-  if (!clip || !clip.isLoaded()) return;
-
-  // Volume from distance. Closer = louder.
-  let vol = map(d, 0, FISH_CALL_FALLOFF, FISH_CALL_MAX_VOL, FISH_CALL_MIN_VOL);
-  vol = constrain(vol, FISH_CALL_MIN_VOL, FISH_CALL_MAX_VOL);
-
-  clip.setVolume(vol);
-  clip.play();
 }
 
 function updateScreenSounds() {
@@ -1021,14 +1127,50 @@ function updateScreenSounds() {
 
   if (gameState === "win" && lastScreenSound !== "win") {
     lastScreenSound = "win";
-    if (stompSound && stompSound.isPlaying()) stompSound.stop(); // ← add
+    if (stompSound && stompSound.isPlaying()) stompSound.stop();
     if (winSound && winSound.isLoaded()) winSound.play();
   } else if (gameState === "loss" && lastScreenSound !== "loss") {
     lastScreenSound = "loss";
-    if (stompSound && stompSound.isPlaying()) stompSound.stop(); // ← add
+    if (stompSound && stompSound.isPlaying()) stompSound.stop();
     if (loseSound && loseSound.isLoaded()) loseSound.play();
   } else if (gameState !== "win" && gameState !== "loss") {
     lastScreenSound = "";
+  }
+}
+
+// ------------------------------------------------------------
+// TIMER SOUND
+// ------------------------------------------------------------
+// Loops exactly while the countdown is actively running, and stops the
+// instant it isn't: on win, loss, any menu screen, or while the timer
+// itself is paused during the first few tutorial cards (tutorialIndex
+// 0-3 — see the pause logic in drawTimer()).
+function updateTimerSound() {
+  if (!timerSound || !timerSound.isLoaded()) return;
+  if (!audioUnlocked || getAudioContext().state !== "running") return;
+
+  const timerPaused =
+    (tutorialActive && tutorialIndex < 4) ||
+    level2CardActive ||
+    level3CardActive;
+  const countdownRunning =
+    timerStarted &&
+    !gameEnded &&
+    !timerPaused &&
+    gameState !== "start" &&
+    gameState !== "story" &&
+    gameState !== "win" &&
+    gameState !== "loss" &&
+    gameState !== "transition" &&
+    gameState !== "level_picker";
+
+  if (countdownRunning) {
+    if (!timerSound.isPlaying()) {
+      timerSound.setVolume(0.5);
+      timerSound.loop();
+    }
+  } else if (timerSound.isPlaying()) {
+    timerSound.stop();
   }
 }
 
@@ -1076,6 +1218,7 @@ function draw() {
   updateMusic();
   updateScreenSounds();
   updateFishCall();
+  updateTimerSound();
   if (gameState === "start") {
     drawStartScreen();
     return;
@@ -1125,6 +1268,7 @@ function draw() {
   updateStompAnimation();
   checkFishCollision();
   checkHoleCollision();
+  updateTutorialComeFindMeSound();
 
   // ---------------- GOAT INIT (only for Level 3) ----------------
   if (currentLevel === 3 && !goatInitialized) {
@@ -1210,13 +1354,18 @@ function draw() {
   drawSpikes();
   drawHoles(HOLE_VISUAL_SCALE);
   drawFish();
-  drawSpikeHitboxes();
   drawWalls();
+
   pop();
+
+  if (currentLevel !== 1) {
+    drawHoleHitboxes();
+  }
 
   // ---------------- GOAT UPDATE ----------------
   if (currentLevel === 3) {
     updateLevel3Goat();
+    drawGoatHitbox();
   }
 
   // ---------------- HOLE FALL / SHAKE / CLIMB SEQUENCE ----------------
@@ -1244,6 +1393,8 @@ function draw() {
 
   // BLIZZARD OVERLAY
   drawBlizzardOverlay();
+
+  drawSpikeHitboxes();
 
   if (holeState === "climbing") {
     drawEnterButtonAtHole();
@@ -1313,6 +1464,14 @@ function draw() {
   // TUTORIAL OVERLAY (tutorial_cards.js)
   if (tutorialActive) {
     drawTutorialOverlay();
+  }
+
+  if (level2CardActive) {
+    drawLevel2CardOverlay();
+  }
+
+  if (level3CardActive) {
+    drawLevel3CardOverlay();
   }
 
   // --- NEED FISH POPUP MESSAGE ---
@@ -1404,14 +1563,24 @@ function keyPressed() {
   // TUTORIAL INPUT (tutorial_cards.js)
   if (handleTutorialKeyPressed()) return;
 
+  // LEVEL 2 INTRO CARD INPUT (level_2.js)
+  if (handleLevel2CardKeyPressed()) return;
+
+  if (handleLevel3CardKeyPressed()) return;
+
+  // TUTORIAL INPUT (tutorial_cards.js)
+  if (handleTutorialKeyPressed()) return;
+
   // WIN SCREEN → ENTER → START
   if (gameState === "win" && keyCode === ENTER) {
+    playButtonClickSound();
     gameState = "start";
     return;
   }
 
   // LOSS SCREEN → R → RESTART
   if (gameState === "loss" && key === "r") {
+    playButtonClickSound();
     resetGame();
     gameState = "playing";
     cursor(ARROW);
@@ -1420,6 +1589,7 @@ function keyPressed() {
 
   // LOSS SCREEN → ENTER → START
   if (gameState === "loss" && keyCode === ENTER) {
+    playButtonClickSound();
     gameState = "start";
     return;
   }
@@ -1448,8 +1618,8 @@ function resetGame() {
 
   fish.collected = false;
   randomizeFishPosition();
-  lastFishCallTime = millis();
-  farCallIndex = 0;
+  lastNearCallTime = 0;
+  comeFindMePlayed = false;
 
   // HOLE SEQUENCE RESET
   holeState = "none";
@@ -1524,6 +1694,19 @@ function updateCamera() {
 }
 
 function drawTimer() {
+  // Pause the countdown during the first 4 tutorial cards (tutorialIndex
+  // 0-3). Shifting startTime forward by the elapsed frame time keeps
+  // "elapsed" from advancing while paused, without needing a separate
+  // paused-duration accumulator.
+  if (
+    timerStarted &&
+    ((tutorialActive && tutorialIndex < 4) ||
+      level2CardActive ||
+      level3CardActive)
+  ) {
+    startTime += deltaTime;
+  }
+
   let elapsed = 0;
   if (timerStarted) {
     elapsed = floor((millis() - startTime) / 1000);
@@ -1622,7 +1805,13 @@ function updateWalkSound() {
 
 function handleInput() {
   // --- STOMP ---
-  if (keyIsDown(32) && !stompAnimating) {
+  if (
+    keyIsDown(32) &&
+    !stompAnimating &&
+    !tutorialActive &&
+    !level2CardActive &&
+    !level3CardActive
+  ) {
     stompAnimating = true;
     stompFrame = 0;
     stompFrameTimer = 0;
@@ -1632,15 +1821,40 @@ function handleInput() {
     flashTimer = 150;
 
     // --- STOMP SOUND ---
+    blockFishSounds = true;
+
+    // Stop any fish-search audio already playing so the stomp sound
+    // (and the single fishCallFar[1] ping that follows it) are the only
+    // non-music sounds heard during the stomp.
+    if (fishCallNear && fishCallNear.isPlaying()) fishCallNear.stop();
+    for (const clip of fishCallFar) {
+      if (clip && clip.isPlaying()) clip.stop();
+    }
+
     if (stompSound && stompSound.isLoaded()) {
       stompSound.play();
+      stompSound.onended(playStompFishCall);
+    } else {
+      // no stomp sound available — still let the fish ping happen
+      playStompFishCall();
     }
   }
+
   // Penguin is fully frozen while any tutorial card is on screen —
   // including the last (space dialogue) card. Movement is allowed
   // only when tutorialActive is false, i.e. normal play and the gap
   // between the flashlight card and the space card.
   if (tutorialActive) {
+    player.isMoving = false;
+    return;
+  }
+
+  if (level2CardActive) {
+    player.isMoving = false;
+    return;
+  }
+
+  if (level3CardActive) {
     player.isMoving = false;
     return;
   }
@@ -1663,15 +1877,15 @@ function handleInput() {
   // reset each frame
   player.isMoving = false;
 
-  const W = keyIsDown(87);
-  const A = keyIsDown(65);
-  const S = keyIsDown(83);
-  const D = keyIsDown(68);
+  const W = keyIsDown(87) || keyIsDown(UP_ARROW);
+  const A = keyIsDown(65) || keyIsDown(LEFT_ARROW);
+  const S = keyIsDown(83) || keyIsDown(DOWN_ARROW);
+  const D = keyIsDown(68) || keyIsDown(RIGHT_ARROW);
 
   // --- FIRST GOAT TUTORIAL TRIGGER (LEVEL 3) ---
   if (currentLevel === 3 && W && !goatHasKilledOnce && !goatTriggered) {
     goatTriggered = true;
-    goatTriggerTime = millis(); // start 3s countdown
+    goatTriggerTime = millis();
   }
 
   // --- DIAGONALS FIRST ---
@@ -1714,17 +1928,6 @@ function handleInput() {
     newX += player.speed;
     player.direction = "right";
     player.isMoving = true;
-  }
-
-  // --- STOMP ---
-  if (keyIsDown(32) && !stompAnimating) {
-    stompAnimating = true;
-    stompFrame = 0;
-    stompFrameTimer = 0;
-    waveDelay = 0;
-    waveDelayActive = false;
-    totalTime = max(0, totalTime - 45);
-    flashTimer = 150;
   }
 
   if (WORLD_W_SCALED && WORLD_H_SCALED) {
@@ -1858,6 +2061,9 @@ function checkFishCollision() {
   if (overlap) {
     fish.collected = true;
 
+    // Stop the near-distance loop instantly on collection
+    if (fishCallNear && fishCallNear.isPlaying()) fishCallNear.stop();
+
     // --- COLLECT SOUND ---
     if (fishCollect && fishCollect.isLoaded()) {
       fishCollect.setVolume(0.7);
@@ -1879,16 +2085,43 @@ function checkFishCollision() {
 // still immune to after just having climbed out of them.
 function checkHoleCollision() {
   if (holeState !== "none") return;
-  if (typeof hole === "undefined" || !hole) return; // hole image not loaded yet
+  if (!hole) return;
+
+  // Penguin hitbox (world space)
+  const px = player.x + PENGUIN_HITBOX.offsetX;
+  const py = player.y + PENGUIN_HITBOX.offsetY;
+  const pw = PENGUIN_HITBOX.w;
+  const ph = PENGUIN_HITBOX.h;
 
   for (const h of holes) {
     if (h.immuneUntil && millis() < h.immuneUntil) continue;
 
-    const holeRadius =
-      hole.width * HOLE_VISUAL_SCALE * HOLE_TRIGGER_RADIUS_FACTOR;
-    const d = dist(player.x, player.y, h.x, h.y);
+    // Hole hitbox (world space) — using the SAME shrink factor
+    const hw = hole.width * HOLE_VISUAL_SCALE * HOLE_HITBOX_SCALE;
+    const hh = hole.height * HOLE_VISUAL_SCALE * HOLE_HITBOX_SCALE;
+    const hx = h.x - hw / 2;
+    const hy = h.y - hh / 2;
 
-    if (d < holeRadius) {
+    if (DEBUG_HOLE_HITBOXES) {
+      push();
+      noFill();
+      stroke(255, 0, 255); // magenta so it stands out
+      strokeWeight(3);
+
+      // convert world → screen
+      const scale = camZoom * bgScale;
+      const sx = (hx - camX) * scale;
+      const sy = (hy - camY) * scale;
+
+      rect(sx, sy, hw * scale, hh * scale);
+      pop();
+    }
+
+    // AABB overlap
+    const overlap =
+      px < hx + hw && px + pw > hx && py < hy + hh && py + ph > hy;
+
+    if (overlap) {
       enterHole(h);
       break;
     }
@@ -2101,7 +2334,8 @@ function updateStompAnimation() {
 
     if (stompFrame >= STOMP_NUM_FRAMES) {
       stompAnimating = false;
-      stompFrame = 0;
+      blockFishSounds = false;
+      stompFrame = 0; // reset only when the sequence is actually over
     }
   }
 }
@@ -2145,7 +2379,7 @@ function drawBlizzardOverlay() {
 
   // Full white blizzard layer
   blizzardBuffer.noStroke();
-  blizzardBuffer.fill(255, 255, 255, 253); // change opacity back to 253 after debugging
+  blizzardBuffer.fill(255, 255, 255, 200); // change opacity back to 253 after debugging
   blizzardBuffer.rect(0, 0, width, height);
 
   // Convert penguin world → screen
@@ -2324,6 +2558,7 @@ function mouseReleased() {
     let i = activePanelIndex;
 
     if (playBtnPressed[i] && levelPanels[i].playHover) {
+      playButtonClickSound();
       startLevel(i);
     }
 
@@ -2345,6 +2580,7 @@ function mouseReleased() {
       mouseY < lpBy + lpBh / 2;
 
     if (levelPickerBtnPressed && lpHover) {
+      playButtonClickSound();
       // Show loading transition after winning Level 1
       // or when leaving the Lost screen
       if ((gameState === "win" && currentLevel === 1) || gameState === "loss") {
@@ -2365,6 +2601,7 @@ function mouseReleased() {
       mouseY < lossBy + lossBh / 2;
 
     if (lossBtnPressed && lossHover && gameState === "loss") {
+      playButtonClickSound();
       resetGame();
 
       startTime = millis(); // new starting point

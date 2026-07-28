@@ -17,6 +17,9 @@ let flashlightCard;
 let spaceDialogueCard;
 let hurryCard;
 let instructionDirectionCard;
+let warningSound;
+let warningSoundPlayed = false; // makes sure it only plays once per attempt
+let cardSwitchSound;
 
 // ---- Avalanche warning icon animation ----
 let avalancheFrame = 0;
@@ -35,6 +38,14 @@ function preloadTutorialAssets() {
   instructionDirectionCard = loadImage("assets/images/instruction_directioncard.png");
   avalancheCard = loadImage("assets/images/avalanche_card.png");
   spaceDialogueCard = loadImage("assets/images/space_dialoguecard.png");
+  warningSound = loadSound("assets/sounds/warning_sound.mp3");
+  cardSwitchSound = loadSound("assets/sounds/card_switch_sound.mp3");
+}
+
+function playCardSwitchSound() {
+  if (cardSwitchSound && cardSwitchSound.isLoaded()) {
+    cardSwitchSound.play();
+  }
 }
 
 function resetTutorial() {
@@ -43,6 +54,7 @@ function resetTutorial() {
   tutorialIndex = 0;
   tutorialDelay = 0;
   postTutorialTimer = 0;
+  warningSoundPlayed = false;
 }
 
 // Delayed "space" card that pops up after the tutorial ends
@@ -57,6 +69,7 @@ function updatePostTutorialTimer() {
     gameState = "tutorial";
     tutorialIndex = 4;
     tutorialDelay = 0;
+    playCardSwitchSound();
   }
 }
 
@@ -99,6 +112,7 @@ function handleTutorialKeyPressed() {
   if (tutorialIndex < tutorialSteps.length) {
     tutorialAlpha = 255;
     tutorialDelay = 0;
+    playCardSwitchSound();
     return true;
   }
 
@@ -146,6 +160,7 @@ function handleTutorialMousePressed() {
         gameState = "playing";
       } else {
         tutorialDelay = 0;
+        playCardSwitchSound();
       }
     }
   }
@@ -184,6 +199,7 @@ function handleTutorialMouseReleased() {
     } else if (tutorialIndex < tutorialSteps.length) {
       tutorialAlpha = 255;
       tutorialDelay = 0;
+      playCardSwitchSound();
     } else {
       tutorialActive = false;
       gameState = "playing";
@@ -290,6 +306,12 @@ function drawTutorialOverlay() {
 
   // Avalanche warning dialogue
   if (tutorialIndex === 0) {
+    if (!warningSoundPlayed) {
+      warningSoundPlayed = true;
+      if (warningSound && warningSound.isLoaded()) {
+        warningSound.play();
+      }
+    }
     drawDialogueCard(avalancheCard);
     return;
   }

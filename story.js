@@ -1,8 +1,7 @@
-// story.js — intro shown two panels per page (1&2, 3&4), panel 5 alone.
-
 let storyPanels = [];
 let storyAudio;
 let storyAudioButWhy;
+let startButtonSound;
 
 let storyEntering = true; // running the initial fade-to-black
 let storyFadeToBlack = 0; // 0..255 black overlay on entry
@@ -38,9 +37,11 @@ function preloadStoryAssets() {
   }
   storyAudio = loadSound("assets/sounds/StoryAudio.mp3");
   storyAudioButWhy = loadSound("assets/sounds/Story_Audio_But_Why.mp3");
+  startButtonSound = loadSound("assets/sounds/start_button_sound.mp3");
 }
 
 function beginStory() {
+  if (startButtonSound && startButtonSound.isLoaded()) startButtonSound.play();
   if (introMusic && introMusic.isPlaying()) introMusic.stop();
   gameState = "story";
   storyEntering = true;
@@ -105,6 +106,10 @@ function advanceStory() {
   // so there's no black gap waiting for the audio cue.
   storyPage++;
   for (const p of STORY_PAGES[storyPage]) storyPanelAlphas[p] = 255;
+
+  if (cardSwitchSound && cardSwitchSound.isLoaded()) {
+    cardSwitchSound.play();
+  }
 }
 
 const STORY_CONTINUE_BTN = { x: 0, y: 0, w: 260, h: 60 };
