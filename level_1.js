@@ -3,8 +3,8 @@
 // Possible fish spawn spots for Level 1 (one is picked at random
 // each time randomizeFishPosition() runs).
 const LEVEL1_FISH_SPAWNS = [
-  { x: 798, y: 1345},
-  { x: 385, y: 1115},
+  { x: 798, y: 1345 },
+  { x: 385, y: 1115 },
 ];
 
 // Where the fish first appears when the level loads, expressed
@@ -14,7 +14,7 @@ const LEVEL1_FISH_SPAWNS = [
 function getLevel1FishStart(WORLD_W_SCALED, WORLD_H_SCALED) {
   return {
     x: WORLD_W_SCALED / 2 - 230,
-    y: WORLD_H_SCALED / 2 + 740
+    y: WORLD_H_SCALED / 2 + 740,
   };
 }
 
@@ -31,22 +31,22 @@ function buildLevel1Walls(WORLD_W_SCALED, WORLD_H_SCALED) {
       x1: WORLD_W_SCALED / 2 - 670,
       y1: WORLD_H_SCALED / 2 + 1200,
       x2: WORLD_W_SCALED / 2 + 290,
-      y2: WORLD_H_SCALED / 2 - 1600
+      y2: WORLD_H_SCALED / 2 - 1600,
     },
     // WALL 2 — another diagonal, different angle
     {
       x1: WORLD_W_SCALED / 2 + 700,
       y1: WORLD_H_SCALED / 2 + 1200,
       x2: WORLD_W_SCALED / 2 - 250,
-      y2: WORLD_H_SCALED / 2 - 1600
-    }
+      y2: WORLD_H_SCALED / 2 - 1600,
+    },
   ];
 }
 
 // Rocky spike placements for Level 1. `variant` indexes into the
 // generic SPIKE_HITBOXES / spikeImages arrays defined in sketch.js.
 const LEVEL1_SPIKES = [
- { x: 678, y: 596, variant: 0 },
+  { x: 678, y: 596, variant: 0 },
   { x: 511, y: 569, variant: 0 },
   { x: 640, y: 585, variant: 0 },
   { x: 541, y: 571, variant: 0 },
@@ -148,4 +148,3 @@ const LEVEL1_TOP_OFFSET = 550;
 
 // World Y coordinate of the finish line for Level 1.
 const LEVEL1_FINISH_Y = 556; // <- replace with your recorded value
-
