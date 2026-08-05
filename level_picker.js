@@ -86,6 +86,7 @@ const LOCK_BREAK_DISPLAY_SCALE = 1.0; // ← tune so the break sheet matches the
 const LOCK_BREAK_DIM_ALPHA = 150; // set to 0 to remove the background dim
 
 let pendingUnlockIndex = -1;
+let unlockSound;
 let lockBreakState = "idle"; // "idle" | "moving" | "breaking"
 let lockBreakIndex = -1;
 let lockBreakT = 0;
@@ -102,6 +103,15 @@ function queueLockBreak(justBeatenLevel) {
   if (unlockAnimPlayed[nextIndex]) return; // already unlocked before
   if (bestStars["level" + justBeatenLevel] < 1) return; // no star, no unlock
   pendingUnlockIndex = nextIndex;
+}
+
+// Sound effect for the lock popping open after a level is beaten.
+function playUnlockSound() {
+  if (!unlockSound || !unlockSound.isLoaded()) return;
+  if (typeof audioUnlocked !== "undefined" && !audioUnlocked) return;
+  if (unlockSound.isPlaying()) unlockSound.stop();
+  unlockSound.setVolume(0.8);
+  unlockSound.play();
 }
 
 function startLockBreak(index) {
@@ -185,6 +195,7 @@ function drawLockBreakAnimation() {
       lockBreakFrame = 0;
       lockBreakFrameTimer = 0;
       lockBreakHoldTimer = 0;
+      playUnlockSound(); // synced to the moment the lock cracks
     }
     return;
   }
@@ -237,6 +248,7 @@ function preloadLevelPickerAssets() {
   xButtonImg = loadImage("assets/images/x_button.png");
   // ← rename this to whatever your lock break sprite sheet is actually called
   SPRITES.lockBreak.img = loadImage("assets/images/lock_break.png");
+  unlockSound = loadSound("assets/sounds/unlock_sound.mp3");
 }
 
 function drawLevelPickerScreen() {
@@ -391,7 +403,9 @@ function drawInfoPanel(index) {
   let key = "level" + (index + 1);
   let fastest = fastestTimes[key];
   let fastestText =
-    fastest === null ? "--:--" : floor(fastest / 60) + ":" + nf(fastest % 60, 2);
+    fastest === null
+      ? "--:--"
+      : floor(fastest / 60) + ":" + nf(fastest % 60, 2);
 
   // store into panel so your existing text() calls work
   panel.recordTime = fastestText;
@@ -411,7 +425,14 @@ function drawInfoPanel(index) {
   let btnLabel = hasPlayed ? "PLAY AGAIN" : "PLAY";
 
   // Draw button
-  let hovered = drawButton(btnLabel, btnX, btnY, 220, 60, playBtnPressed[index]);
+  let hovered = drawButton(
+    btnLabel,
+    btnX,
+    btnY,
+    220,
+    60,
+    playBtnPressed[index],
+  );
 
   // store hover if you need it later
   levelPanels[index].playHover = hovered;

@@ -13,6 +13,9 @@ let winStorySkipped = false;
 let winStoryZoom = 1;
 let winStoryLastPage = -1;
 let winStoryClockStart = 0; // millis() when the reveal began (fallback clock)
+let winStoryExiting = false; // running the slow end-of-movie fade to black
+let winStoryFadeOut = 0; // 0..255 black overlay on the way out
+let winStoryBlackHold = 0; // frames to sit on full black before leaving
 
 const WIN_STORY_PANEL_COUNT = 4;
 
@@ -29,6 +32,14 @@ const WIN_STORY_PANEL_CUES = [2, 10, 16, 24];
 const WIN_STORY_FADE_SPEED = 1.8; // ≈2.4s per panel
 const WIN_STORY_CREDITS_FADE = 1.0; // ≈4.3s for the credits card
 const WIN_STORY_BLACK_SPEED = 6; // entry fade-to-black
+
+// End-of-movie fade out. Alpha added per frame, so 0.75 ≈ 5.7s.
+const WIN_STORY_EXIT_FADE_SPEED = 0.75;
+const WIN_STORY_BLACK_HOLD_FRAMES = 60; // ~1s of pure black before the title
+
+// Length of win_screen_story_audio.mp3, used only if the file never loads
+// and the fallback clock has to decide when the credits are over.
+const WIN_STORY_TRACK_LENGTH = 139;
 
 const WIN_STORY_NARRATION_VOLUME = 3;
 
@@ -85,6 +96,9 @@ function beginWinStory() {
   winStoryZoom = WIN_STORY_ZOOM_START;
   winStoryLastPage = -1;
   winStoryClockStart = millis();
+  winStoryExiting = false;
+  winStoryFadeOut = 0;
+  winStoryBlackHold = WIN_STORY_BLACK_HOLD_FRAMES;
 }
 
 function isWinStoryLastPage() {
@@ -114,6 +128,30 @@ function winStoryTime() {
 
 function stopWinStoryAudio() {
   if (winStoryAudio && winStoryAudio.isPlaying()) winStoryAudio.stop();
+}
+
+// True once the credits track has run out (or the fallback clock has).
+function winStoryNarrationFinished() {
+  if (winStoryAudio && winStoryAudio.isLoaded()) {
+    const dur = winStoryAudio.duration();
+    if (dur && dur > 0) return winStoryTime() >= dur - 0.2;
+  }
+  return winStoryTime() >= WIN_STORY_TRACK_LENGTH;
+}
+
+// Begin the slow fade to black. The audio is ramped down over the same
+// window so the picture and the sound go out together.
+function startWinStoryExit() {
+  if (winStoryExiting) return;
+
+  winStoryExiting = true;
+  winStoryFadeOut = 0;
+  winStoryBlackHold = WIN_STORY_BLACK_HOLD_FRAMES;
+
+  if (winStoryAudio && winStoryAudio.isPlaying()) {
+    const rampSeconds = 255 / WIN_STORY_EXIT_FADE_SPEED / 60;
+    winStoryAudio.setVolume(0, rampSeconds);
+  }
 }
 
 function leaveWinStory() {
@@ -152,11 +190,11 @@ function skipWinStory() {
   winStorySkipped = true;
 }
 
-// ENTER only does something on the credits card: it leaves.
+// ENTER only does something on the credits card: it starts the fade out.
 function advanceWinStory() {
   if (winStoryEntering) return;
   if (!isWinStoryLastPage()) return;
-  leaveWinStory();
+  startWinStoryExit();
 }
 
 const WIN_STORY_SKIP_BTN = { x: 0, y: 0, w: 160, h: 50 };
@@ -166,8 +204,8 @@ const WIN_STORY_RESTART_BTN = { x: 0, y: 0, w: 320, h: 64 };
 // inside it using its own aspect ratio, so nothing ever gets squashed.
 function winStorySlotBox(slot, count) {
   const pad = 36; // gap between the two stacked panels
-  const topMargin = 40;
-  const bottomMargin = 110; // room for the buttons
+  const topMargin = 110; // breathing room above the top panel
+  const bottomMargin = 130; // room for the buttons
 
   const areaW = width - pad * 2;
   const areaH = height - topMargin - bottomMargin;
@@ -239,8 +277,20 @@ function drawWinStoryScreen() {
     return;
   }
 
-  // --- REVEAL ---
-  if (winStorySkipped) {
+  // --- END OF THE CREDITS TRACK → roll the slow fade to black ---
+  if (
+    !winStoryExiting &&
+    isWinStoryLastPage() &&
+    winStoryPanelAlphas[WIN_STORY_PANEL_COUNT - 1] >= 255 &&
+    winStoryNarrationFinished()
+  ) {
+    startWinStoryExit();
+  }
+
+  // --- REVEAL (frozen once the fade out begins) ---
+  if (winStoryExiting) {
+    // hold the current frame
+  } else if (winStorySkipped) {
     // Skipped: the narration is already fast-forwarded to the credits cue,
     // so just fade the credits card in over it.
     const last = WIN_STORY_PANEL_COUNT - 1;
@@ -313,7 +363,9 @@ function drawWinStoryScreen() {
   // --- BUTTONS: Skip while the story runs, Restart on the credits card ---
   let anyHover = false;
 
-  if (isWinStoryLastPage()) {
+  if (winStoryExiting) {
+    // No buttons once the picture starts going out.
+  } else if (isWinStoryLastPage()) {
     WIN_STORY_RESTART_BTN.x = width / 2;
     WIN_STORY_RESTART_BTN.y = height - 45;
     anyHover =
@@ -340,6 +392,24 @@ function drawWinStoryScreen() {
   }
 
   cursor(anyHover ? HAND : ARROW);
+
+  // --- SLOW FADE TO BLACK, then the title screen ---
+  if (winStoryExiting) {
+    winStoryFadeOut = min(255, winStoryFadeOut + WIN_STORY_EXIT_FADE_SPEED);
+
+    push();
+    resetMatrix();
+    rectMode(CORNER);
+    noStroke();
+    fill(0, winStoryFadeOut);
+    rect(0, 0, width, height);
+    pop();
+
+    if (winStoryFadeOut >= 255) {
+      winStoryBlackHold--;
+      if (winStoryBlackHold <= 0) leaveWinStory();
+    }
+  }
 }
 
 function winStoryHitButton(b) {
@@ -353,11 +423,12 @@ function winStoryHitButton(b) {
 
 function handleWinStoryClick() {
   if (winStoryEntering) return true;
+  if (winStoryExiting) return true; // ignore clicks once the fade starts
 
   if (isWinStoryLastPage()) {
     if (winStoryHitButton(WIN_STORY_RESTART_BTN)) {
       if (typeof playButtonClickSound === "function") playButtonClickSound();
-      leaveWinStory();
+      startWinStoryExit();
       return true;
     }
     return false;
