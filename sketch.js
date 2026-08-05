@@ -795,6 +795,7 @@ function preload() {
   SPRITES.as.img = loadImage("assets/images/as_key_penguin.png");
   SPRITES.lockBreak.img = loadImage("assets/images/lock_break.png");
   preloadStoryAssets();
+  preloadWinStoryAssets();
   startBg = loadImage("assets/images/title_screen.png");
   winBg = loadImage("assets/images/win_screen.png");
   lossBg = loadImage("assets/images/loss_screen.png");
@@ -1670,6 +1671,7 @@ function updateFishCall() {
   const playing =
     gameState !== "start" &&
     gameState !== "story" &&
+    gameState !== "win_story" &&
     gameState !== "win" &&
     gameState !== "loss" &&
     gameState !== "transition" &&
@@ -1690,12 +1692,25 @@ function updateFishCall() {
 }
 
 function updateScreenSounds() {
-  if (!audioUnlocked || getAudioContext().state !== "running") return;
+  if (!audioUnlocked) return;
+  if (getAudioContext().state !== "running") return;
 
-  if (gameState === "win" && lastScreenSound !== "win") {
+  const onWinScreen = gameState === "win" || gameState === "win_story";
+
+  if (onWinScreen && lastScreenSound !== "win") {
     lastScreenSound = "win";
 
-    cancelStompAudio();
+    if (typeof cancelStompAudio === "function") {
+      cancelStompAudio();
+    }
+
+    if (stompSound && stompSound.isPlaying()) {
+      stompSound.stop();
+    }
+
+    if (stompAura && stompAura.isPlaying()) {
+      stompAura.stop();
+    }
 
     if (walkSound && walkSound.isPlaying()) {
       walkSound.stop();
@@ -1711,8 +1726,17 @@ function updateScreenSounds() {
   } else if (gameState === "loss" && lastScreenSound !== "loss") {
     lastScreenSound = "loss";
 
-    // Final cleanup when the loss screen begins.
-    cancelStompAudio();
+    if (typeof cancelStompAudio === "function") {
+      cancelStompAudio();
+    }
+
+    if (stompSound && stompSound.isPlaying()) {
+      stompSound.stop();
+    }
+
+    if (stompAura && stompAura.isPlaying()) {
+      stompAura.stop();
+    }
 
     if (walkSound && walkSound.isPlaying()) {
       walkSound.stop();
@@ -1725,11 +1749,10 @@ function updateScreenSounds() {
     if (loseSound && loseSound.isLoaded()) {
       loseSound.play();
     }
-  } else if (gameState !== "win" && gameState !== "loss") {
+  } else if (!onWinScreen && gameState !== "loss") {
     lastScreenSound = "";
   }
 }
-
 // ------------------------------------------------------------
 // TIMER SOUND
 // ------------------------------------------------------------
@@ -1759,6 +1782,7 @@ function updateTimerSound() {
     !timerPaused &&
     gameState !== "start" &&
     gameState !== "story" &&
+    gameState !== "win_story" &&
     gameState !== "win" &&
     gameState !== "loss" &&
     gameState !== "transition" &&
@@ -1783,6 +1807,7 @@ function updateMusic() {
   const wantGame = ![
     "start",
     "story",
+    "win_story",
     "win",
     "loss",
     "transition",
@@ -1838,356 +1863,368 @@ function draw() {
     return;
   }
 
-  // FIRST / TITLE SCREEN
-  if (gameState === "start") {
-    drawStartScreen();
-
-    if (debugMode) {
-      drawDebugPanel();
-    }
-
+  // FINAL STORY AFTER COMPLETING LEVEL 3
+  if (gameState === "win_story") {
+    drawWinStoryScreen();
     return;
   }
 
-  // WIN SCREEN
-  if (gameState === "win") {
-    drawWinScreen();
-
-    if (debugMode) {
-      drawDebugPanel();
-    }
-
-    return;
-  }
-
-  // LOSE SCREEN
-  if (gameState === "loss") {
-    drawLossScreen();
-
-    if (debugMode) {
-      drawDebugPanel();
-    }
-
-    return;
-  }
-
-  // TRANSITION SCREEN
-  if (gameState === "transition") {
-    drawTransitionScreen();
-
-    if (debugMode) {
-      drawDebugPanel();
-    }
-
-    return;
-  }
-
-  // LEVEL PICKER
-  if (gameState === "level_picker") {
-    drawLevelPickerScreen();
-
-    if (debugMode) {
-      drawDebugPanel();
-    }
-
-    return;
-  }
-
-  // -------------------------
-  // GAMEPLAY
-  // -------------------------
-  if (gameEnded) {
-    gameState = "loss";
-    drawLossScreen();
-
-    if (debugMode) {
-      drawDebugPanel();
-    }
-
-    return;
-  }
-
-  if (!timerStarted) {
-    timerStarted = true;
-    startTime = millis();
-  }
-
-  // Only update gameplay when the pause menu is closed.
-  if (!isGamePaused) {
-    handleInput();
-    updateWalkSound();
-    animateSprite();
-    updateCamera();
-    updateStompAnimation();
-    checkFishCollision();
-    checkHoleCollision();
-    updateTutorialComeFindMeSound();
-  } else {
-    player.isMoving = false;
-  }
-
-  // ---------------- GOAT INIT (only for Level 3) ----------------
-  if (!isGamePaused && currentLevel === 3 && !goatInitialized) {
-    goatInitialized = true;
-    goatStartTime = millis();
-    goatDirection = random(["left", "right"]);
-  }
-
-  // While the penguin is falling/shaking/climbing in a hole, skip the
-  // top-exit fish gate and the win check — those only apply to normal play.
-  if (!isGamePaused && holeState === "none") {
-    // --- BLOCK TOP EXIT IF FISH NOT COLLECTED ---
-    if (!fish.collected && player.y < finishY) {
-      player.y = finishY;
-      // trigger popup message
-      needFishMessageActive = true;
-      needFishMessageTimer = needFishMessageDuration;
-    }
-
-    // -------------------------
-    // WIN CONDITION (correct)
-    // -------------------------
-    if (player.y < finishY && fish.collected) {
-      let elapsed = floor((millis() - startTime) / 1000);
-      finalTime = elapsed;
-
-      // --- STAR SCORING ---
-      starsEarned = 0;
-      if (fish.collected) starsEarned++;
-      let timeLeft = totalTime - finalTime;
-      if (timeLeft >= 30) starsEarned++;
-      if (timeLeft >= 60) starsEarned++;
-
-      // highest score
-      let starKey = "level" + currentLevel;
-      if (starsEarned > bestStars[starKey]) {
-        bestStars[starKey] = starsEarned;
-      }
-
-      // --- UPDATE FASTEST TIME ---
-      let key = "level" + currentLevel;
-      if (fastestTimes[key] === null || finalTime < fastestTimes[key]) {
-        fastestTimes[key] = finalTime;
-        fastestTimesIsNew[key] = true;
-      } else {
-        fastestTimesIsNew[key] = false;
-      }
-
-      tutorialActive = false;
-      postTutorialTimerActive = false;
-      queueLockBreak(currentLevel);
-      gameState = "win";
-      return;
-    }
-  }
-
-  // WAVE DELAY + WAVE UPDATE
-  if (!isGamePaused) {
-    if (waveDelayActive) {
-      waveDelay--;
-
-      if (waveDelay <= 0) {
-        waveDelayActive = false;
-        startWaveForFrame(4);
-      }
-    }
-
-    if (waveActive) {
-      updateWave();
-    }
-  }
-
-  // DRAW WORLD
-  push();
-  scale(camZoom * bgScale);
-  translate(-camX, -camY);
-  if (holeState === "shaking") {
-    // shake is expressed in screen pixels — divide by the current zoom/scale
-    // so it reads as a consistent shake regardless of camera zoom
-    translate(
-      holeShakeOffsetX / (camZoom * bgScale),
-      holeShakeOffsetY / (camZoom * bgScale),
-    );
-  }
-  drawBackground();
-  drawSpikes();
-  drawHoles(HOLE_VISUAL_SCALE);
-  drawFish();
-  drawWalls();
-
-  pop();
-
-  if (currentLevel !== 1) {
-    drawHoleHitboxes();
-  }
-
-  // ---------------- GOAT UPDATE ----------------
-  if (currentLevel === 3) {
-    if (!isGamePaused) {
-      updateLevel3Goat();
-    }
-
-    drawGoatHitbox();
-  }
-
-  // ---------------- HOLE FALL / SHAKE / CLIMB SEQUENCE ----------------
-  if (holeState === "falling") {
-    if (!isGamePaused) {
-      updateHoleFall();
-    }
-
-    drawHoleFallAnimation();
-  } else if (holeState === "shaking") {
-    if (!isGamePaused) {
-      updateHoleShake();
-    }
-
-    // Penguin stays hidden during the shake.
-  } else if (holeState === "climbing") {
-    drawHoleClimbAnimation();
-  } else {
-    drawCharacterOnScreen();
-    drawPenguinHitbox();
-  }
-
-  // Capture world frame for X-ray ring — only needed while the wave/X-ray
-  // ring is actually active. get() does a full-canvas pixel readback, so
-  // doing it unconditionally every frame (as before) was wasted work the
-  // vast majority of the time.
-  if (waveActive) {
-    baseWorldFrame = get();
-  }
-
-  // BLIZZARD OVERLAY
-  drawBlizzardOverlay();
-
-  drawSpikeHitboxes();
-
-  if (holeState === "climbing") {
-    drawEnterButtonAtHole();
-  }
-
-  // X-RAY RING
-  if (waveActive) {
-    ringMaskBuffer.clear();
-    ringMaskBuffer.noStroke();
-
-    const cx = (player.x - camX) * camZoom * bgScale + ringOffsetX;
-    const cy = (player.y - camY) * camZoom * bgScale + ringOffsetY;
-
-    const outerRadius = waveRadius;
-    const innerRadius = waveRadius - 140;
-
-    ringMaskBuffer.fill(255);
-    ringMaskBuffer.circle(cx, cy, outerRadius * 2);
-
-    if (innerRadius > 0) {
-      ringMaskBuffer.erase();
-      ringMaskBuffer.circle(cx, cy, innerRadius * 2);
-      ringMaskBuffer.noErase();
-    }
-
-    blueBuffer.clear();
-    blueBuffer.image(baseWorldFrame, 0, 0);
-
-    let maskedBlue = blueBuffer.get();
-    maskedBlue.mask(ringMaskBuffer);
-
-    let fade = map(waveRadius, waveMaxRadius * 0.7, waveMaxRadius, 255, 0);
-    fade = constrain(fade, 0, 255);
-
-    tint(0, 120, 255, fade);
-    image(maskedBlue, 0, 0);
-    noTint();
-  }
-
-  // TIMER
-  drawTimer();
-
-  // draw fish ui
-  drawFishIconUI();
-
-  // Settings button stays fixed to the screen.
-  drawSettingsButton();
-
-  // fish compass during stomping
-  if (waveActive) {
-    drawFishCompass();
-  }
-
-  // DEBUG: on-screen coordinates — walk the penguin around and read
-  // these numbers off to build your walls/spikes/fish spots for new levels
-  if (DEBUG_SHOW_COORDS) {
-    push();
-    fill(255);
-    stroke(0);
-    strokeWeight(3);
-    textSize(20);
-    textAlign(LEFT, TOP);
-    text("Player: " + floor(player.x) + ", " + floor(player.y), 20, 120);
-    pop();
-  }
-
-  // TUTORIAL POST-DELAY (tutorial_cards.js)
-  updatePostTutorialTimer();
-
-  // TUTORIAL OVERLAY (tutorial_cards.js)
-  if (tutorialActive) {
-    drawTutorialOverlay();
-  }
-
-  if (level2CardActive) {
-    drawLevel2CardOverlay();
-  }
-
-  if (level3CardActive) {
-    drawLevel3CardOverlay();
-  }
-
-  // --- NEED FISH POPUP MESSAGE ---
-  if (needFishMessageActive) {
-    needFishMessageTimer--;
-    push();
-    imageMode(CENTER);
-    const cardW = min(730, width - 160);
-    const cardH = cardW * (popUpCard.height / popUpCard.width);
-    const cardY = 180; // moves the popup closer to the timer
-    image(popUpCard, width / 2, cardY, cardW, cardH);
-    pop();
-    if (needFishMessageTimer <= 0) {
-      needFishMessageActive = false;
-    }
-  }
-
-  if (foundFishMessageActive) {
-    foundFishMessageTimer--;
-    push();
-    imageMode(CENTER);
-    if (
-      foundPopupCard &&
-      foundPopupCard.width > 0 &&
-      foundPopupCard.height > 0
-    ) {
-      const cardW = min(750, width - 180);
-      const cardH = cardW * (foundPopupCard.height / foundPopupCard.width);
-      const cardY = 180;
-      image(foundPopupCard, width / 2, cardY, cardW, cardH);
-    }
-    pop();
-    if (foundFishMessageTimer <= 0) {
-      foundFishMessageActive = false;
-    }
-  }
-
-  // Draw this LAST so it stays above the gameplay.
   if (debugMode) {
     drawDebugPanel();
   }
 
-  // Draw this after all gameplay so it appears above everything.
-  if (isGamePaused) {
-    drawPauseMenu();
+  return;
+}
+
+// FIRST / TITLE SCREEN
+if (gameState === "start") {
+  drawStartScreen();
+
+  if (debugMode) {
+    drawDebugPanel();
   }
+
+  return;
+}
+
+// WIN SCREEN
+if (gameState === "win") {
+  drawWinScreen();
+
+  if (debugMode) {
+    drawDebugPanel();
+  }
+
+  return;
+}
+
+// LOSE SCREEN
+if (gameState === "loss") {
+  drawLossScreen();
+
+  if (debugMode) {
+    drawDebugPanel();
+  }
+
+  return;
+}
+
+// TRANSITION SCREEN
+if (gameState === "transition") {
+  drawTransitionScreen();
+
+  if (debugMode) {
+    drawDebugPanel();
+  }
+
+  return;
+}
+
+// LEVEL PICKER
+if (gameState === "level_picker") {
+  drawLevelPickerScreen();
+
+  if (debugMode) {
+    drawDebugPanel();
+  }
+
+  return;
+}
+
+// -------------------------
+// GAMEPLAY
+// -------------------------
+if (gameEnded) {
+  gameState = "loss";
+  drawLossScreen();
+
+  if (debugMode) {
+    drawDebugPanel();
+  }
+
+  return;
+}
+
+if (!timerStarted) {
+  timerStarted = true;
+  startTime = millis();
+}
+
+// Only update gameplay when the pause menu is closed.
+if (!isGamePaused) {
+  handleInput();
+  updateWalkSound();
+  animateSprite();
+  updateCamera();
+  updateStompAnimation();
+  checkFishCollision();
+  checkHoleCollision();
+  updateTutorialComeFindMeSound();
+} else {
+  player.isMoving = false;
+}
+
+// ---------------- GOAT INIT (only for Level 3) ----------------
+if (!isGamePaused && currentLevel === 3 && !goatInitialized) {
+  goatInitialized = true;
+  goatStartTime = millis();
+  goatDirection = random(["left", "right"]);
+}
+
+// While the penguin is falling/shaking/climbing in a hole, skip the
+// top-exit fish gate and the win check — those only apply to normal play.
+if (!isGamePaused && holeState === "none") {
+  // --- BLOCK TOP EXIT IF FISH NOT COLLECTED ---
+  if (!fish.collected && player.y < finishY) {
+    player.y = finishY;
+    // trigger popup message
+    needFishMessageActive = true;
+    needFishMessageTimer = needFishMessageDuration;
+  }
+
+  // -------------------------
+  // WIN CONDITION (correct)
+  // -------------------------
+  if (player.y < finishY && fish.collected) {
+    let elapsed = floor((millis() - startTime) / 1000);
+    finalTime = elapsed;
+
+    // --- STAR SCORING ---
+    starsEarned = 0;
+    if (fish.collected) starsEarned++;
+    let timeLeft = totalTime - finalTime;
+    if (timeLeft >= 30) starsEarned++;
+    if (timeLeft >= 60) starsEarned++;
+
+    // highest score
+    let starKey = "level" + currentLevel;
+    if (starsEarned > bestStars[starKey]) {
+      bestStars[starKey] = starsEarned;
+    }
+
+    // --- UPDATE FASTEST TIME ---
+    let key = "level" + currentLevel;
+    if (fastestTimes[key] === null || finalTime < fastestTimes[key]) {
+      fastestTimes[key] = finalTime;
+      fastestTimesIsNew[key] = true;
+    } else {
+      fastestTimesIsNew[key] = false;
+    }
+
+    tutorialActive = false;
+    postTutorialTimerActive = false;
+
+    queueLockBreak(currentLevel);
+
+    // Levels 1 and 2 still show the regular score screen.
+    // Completing Level 3 begins the ending story.
+    beginWinStory();
+    return;
+  }
+}
+
+// WAVE DELAY + WAVE UPDATE
+if (!isGamePaused) {
+  if (waveDelayActive) {
+    waveDelay--;
+
+    if (waveDelay <= 0) {
+      waveDelayActive = false;
+      startWaveForFrame(4);
+    }
+  }
+
+  if (waveActive) {
+    updateWave();
+  }
+}
+
+// DRAW WORLD
+push();
+scale(camZoom * bgScale);
+translate(-camX, -camY);
+if (holeState === "shaking") {
+  // shake is expressed in screen pixels — divide by the current zoom/scale
+  // so it reads as a consistent shake regardless of camera zoom
+  translate(
+    holeShakeOffsetX / (camZoom * bgScale),
+    holeShakeOffsetY / (camZoom * bgScale),
+  );
+}
+drawBackground();
+drawSpikes();
+drawHoles(HOLE_VISUAL_SCALE);
+drawFish();
+drawWalls();
+
+pop();
+
+if (currentLevel !== 1) {
+  drawHoleHitboxes();
+}
+
+// ---------------- GOAT UPDATE ----------------
+if (currentLevel === 3) {
+  if (!isGamePaused) {
+    updateLevel3Goat();
+  }
+
+  drawGoatHitbox();
+}
+
+// ---------------- HOLE FALL / SHAKE / CLIMB SEQUENCE ----------------
+if (holeState === "falling") {
+  if (!isGamePaused) {
+    updateHoleFall();
+  }
+
+  drawHoleFallAnimation();
+} else if (holeState === "shaking") {
+  if (!isGamePaused) {
+    updateHoleShake();
+  }
+
+  // Penguin stays hidden during the shake.
+} else if (holeState === "climbing") {
+  drawHoleClimbAnimation();
+} else {
+  drawCharacterOnScreen();
+  drawPenguinHitbox();
+}
+
+// Capture world frame for X-ray ring — only needed while the wave/X-ray
+// ring is actually active. get() does a full-canvas pixel readback, so
+// doing it unconditionally every frame (as before) was wasted work the
+// vast majority of the time.
+if (waveActive) {
+  baseWorldFrame = get();
+}
+
+// BLIZZARD OVERLAY
+drawBlizzardOverlay();
+
+drawSpikeHitboxes();
+
+if (holeState === "climbing") {
+  drawEnterButtonAtHole();
+}
+
+// X-RAY RING
+if (waveActive) {
+  ringMaskBuffer.clear();
+  ringMaskBuffer.noStroke();
+
+  const cx = (player.x - camX) * camZoom * bgScale + ringOffsetX;
+  const cy = (player.y - camY) * camZoom * bgScale + ringOffsetY;
+
+  const outerRadius = waveRadius;
+  const innerRadius = waveRadius - 140;
+
+  ringMaskBuffer.fill(255);
+  ringMaskBuffer.circle(cx, cy, outerRadius * 2);
+
+  if (innerRadius > 0) {
+    ringMaskBuffer.erase();
+    ringMaskBuffer.circle(cx, cy, innerRadius * 2);
+    ringMaskBuffer.noErase();
+  }
+
+  blueBuffer.clear();
+  blueBuffer.image(baseWorldFrame, 0, 0);
+
+  let maskedBlue = blueBuffer.get();
+  maskedBlue.mask(ringMaskBuffer);
+
+  let fade = map(waveRadius, waveMaxRadius * 0.7, waveMaxRadius, 255, 0);
+  fade = constrain(fade, 0, 255);
+
+  tint(0, 120, 255, fade);
+  image(maskedBlue, 0, 0);
+  noTint();
+}
+
+// TIMER
+drawTimer();
+
+// draw fish ui
+drawFishIconUI();
+
+// Settings button stays fixed to the screen.
+drawSettingsButton();
+
+// fish compass during stomping
+if (waveActive) {
+  drawFishCompass();
+}
+
+// DEBUG: on-screen coordinates — walk the penguin around and read
+// these numbers off to build your walls/spikes/fish spots for new levels
+if (DEBUG_SHOW_COORDS) {
+  push();
+  fill(255);
+  stroke(0);
+  strokeWeight(3);
+  textSize(20);
+  textAlign(LEFT, TOP);
+  text("Player: " + floor(player.x) + ", " + floor(player.y), 20, 120);
+  pop();
+}
+
+// TUTORIAL POST-DELAY (tutorial_cards.js)
+updatePostTutorialTimer();
+
+// TUTORIAL OVERLAY (tutorial_cards.js)
+if (tutorialActive) {
+  drawTutorialOverlay();
+}
+
+if (level2CardActive) {
+  drawLevel2CardOverlay();
+}
+
+if (level3CardActive) {
+  drawLevel3CardOverlay();
+}
+
+// --- NEED FISH POPUP MESSAGE ---
+if (needFishMessageActive) {
+  needFishMessageTimer--;
+  push();
+  imageMode(CENTER);
+  const cardW = min(730, width - 160);
+  const cardH = cardW * (popUpCard.height / popUpCard.width);
+  const cardY = 180; // moves the popup closer to the timer
+  image(popUpCard, width / 2, cardY, cardW, cardH);
+  pop();
+  if (needFishMessageTimer <= 0) {
+    needFishMessageActive = false;
+  }
+}
+
+if (foundFishMessageActive) {
+  foundFishMessageTimer--;
+  push();
+  imageMode(CENTER);
+  if (foundPopupCard && foundPopupCard.width > 0 && foundPopupCard.height > 0) {
+    const cardW = min(750, width - 180);
+    const cardH = cardW * (foundPopupCard.height / foundPopupCard.width);
+    const cardY = 180;
+    image(foundPopupCard, width / 2, cardY, cardW, cardH);
+  }
+  pop();
+  if (foundFishMessageTimer <= 0) {
+    foundFishMessageActive = false;
+  }
+}
+
+// Draw this LAST so it stays above the gameplay.
+if (debugMode) {
+  drawDebugPanel();
+}
+
+// Draw this after all gameplay so it appears above everything.
+if (isGamePaused) {
+  drawPauseMenu();
 }
 
 function keyPressed() {
@@ -2294,6 +2331,31 @@ function keyPressed() {
     return;
   }
 
+  if (gameState === "win_story" && keyCode === ENTER) {
+    if (isWinStoryLastPage() && winStoryPageFullyShown()) {
+      leaveWinStory();
+    } else {
+      advanceWinStory();
+    }
+    return;
+  }
+
+  function advanceWinStory() {
+    if (winStoryEntering) return;
+
+    if (isWinStoryLastPage()) {
+      for (const p of WIN_STORY_PAGES[winStoryPage])
+        winStoryPanelAlphas[p] = 255;
+      leaveWinStory();
+      return;
+    }
+
+    winStoryPage++;
+    for (const p of WIN_STORY_PAGES[winStoryPage]) winStoryPanelAlphas[p] = 255;
+    winStoryRevealTimer = WIN_STORY_SECOND_DELAY;
+    winStoryAutoTimer = WIN_STORY_AUTO_DELAY;
+  }
+
   // START SCREEN → ENTER → STORY
   if (gameState === "start" && keyCode === ENTER) {
     beginStory(); // was: gameState = "level_picker";
@@ -2349,9 +2411,18 @@ function keyPressed() {
   if (handleTutorialKeyPressed()) return;
 
   // WIN SCREEN → ENTER → START
+  // WIN SCREEN → ENTER
   if (gameState === "win" && keyCode === ENTER) {
     playButtonClickSound();
-    startLevelPickerTransition(); // was: gameState = "start";
+
+    if (currentLevel === 3) {
+      // After viewing the Level 3 win screen, begin the ending story.
+      beginWinStory();
+    } else {
+      // Levels 1 and 2 behave normally.
+      startLevelPickerTransition();
+    }
+
     return;
   }
 
@@ -3416,6 +3487,11 @@ function mousePressed() {
     return;
   }
 
+  if (gameState === "win_story") {
+    handleWinStoryClick();
+    return;
+  }
+
   unlockAudio();
   // First click on the title screen only opens the gate + starts the music.
   // It must NOT also press Start, or the player skips the title screen.
@@ -3601,9 +3677,17 @@ function mouseReleased() {
 
     if (levelPickerBtnPressed && lpHover) {
       playButtonClickSound();
-      if ((gameState === "win" && currentLevel === 1) || gameState === "loss") {
+
+      if (gameState === "win" && currentLevel === 3) {
+        // Level 3 win screen → ending story.
+        beginWinStory();
+      } else if (
+        (gameState === "win" && currentLevel === 1) ||
+        gameState === "loss"
+      ) {
         startLevelPickerTransition();
       } else {
+        // Normal Level 2 win-screen behaviour.
         gameState = "level_picker";
       }
     }
