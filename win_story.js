@@ -41,7 +41,7 @@ const WIN_STORY_BLACK_HOLD_FRAMES = 60; // ~1s of pure black before the title
 // and the fallback clock has to decide when the credits are over.
 const WIN_STORY_TRACK_LENGTH = 139;
 
-const WIN_STORY_NARRATION_VOLUME = 5;
+const WIN_STORY_NARRATION_VOLUME = 7;
 
 // Corner rounding on the panels (px, clamped so it can't exceed half a side).
 const WIN_STORY_CORNER_RADIUS = 26;
