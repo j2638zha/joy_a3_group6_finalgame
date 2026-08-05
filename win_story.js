@@ -41,7 +41,7 @@ const WIN_STORY_BLACK_HOLD_FRAMES = 60; // ~1s of pure black before the title
 // and the fallback clock has to decide when the credits are over.
 const WIN_STORY_TRACK_LENGTH = 139;
 
-const WIN_STORY_NARRATION_VOLUME = 3;
+const WIN_STORY_NARRATION_VOLUME = 5;
 
 // Corner rounding on the panels (px, clamped so it can't exceed half a side).
 const WIN_STORY_CORNER_RADIUS = 26;
@@ -52,10 +52,12 @@ const WIN_STORY_ZOOM_MAX = 1.05;
 const WIN_STORY_ZOOM_SPEED = 0.00025;
 
 // Page layout: panels 1&2 together, panel 3 alone, panel 4 (credits) alone.
+// One panel per screen.
 const WIN_STORY_PAGES = [
-  [0, 1], // page 0 → panels 1 & 2
-  [2], // page 1 → panel 3 alone
-  [3], // page 2 → panel 4 (credits) alone
+  [0], // 0:02–0:09
+  [1], // 0:10–0:15
+  [2], // 0:16–0:23
+  [3], // 0:24 onward
 ];
 
 function preloadWinStoryAssets() {
