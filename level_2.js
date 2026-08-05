@@ -1,11 +1,10 @@
 // level_2.js file
-
 const LEVEL2_HOLES = [
   { x: 622, y: 923 },
   { x: 880, y: 1040 },
   { x: 232, y: 891 },
   { x: 373, y: 724 },
-  { x: 820, y: 698 },
+  { x: 820, y: 670 },
   { x: 70, y: 1277 },
   { x: 150, y: 1277 },
   { x: 230, y: 1277 },
@@ -61,6 +60,26 @@ function handleLevel2CardKeyPressed() {
     cursor(ARROW);
   } else {
     playCardSwitchSound(); // same sound used when tutorial cards advance
+  }
+
+  return true;
+}
+
+function handleLevel2CardMousePressed() {
+  if (gameState !== "level2_card") return false;
+
+  level2CardStep++;
+
+if (level2CardStep >= 2) {
+  level2CardActive = false;
+
+  startTime = millis();
+  timerStarted = true;
+
+  gameState = "playing";
+  cursor(ARROW);
+} else {
+    playCardSwitchSound();
   }
 
   return true;
@@ -162,6 +181,7 @@ const LEVEL2_SPIKES = [
  { x: 911, y: 795, variant: 2 },
  { x: 876, y: 839, variant: 2 },
  { x: 851, y: 871, variant: 2 },
+ { x: 845, y: 905, variant: 0 },
  { x: 817, y: 923, variant: 2 },
  { x: 794, y: 959, variant: 2 },
  { x: 768, y: 995, variant: 2 },

@@ -11,10 +11,9 @@ function drawWinScreen() {
   const drawOrder = [0, 2, 1];
 
   for (let i = 0; i < 3; i++) {
-    let starIndex = drawOrder[i];
     let sx = startX + i * 80;
     let yOffset = (i === 1) ? -10 : 0;
-    if (starIndex < starsEarned) {
+    if (i < starsEarned) {
       image(starFilledImg, sx, y + yOffset, starW, starH);
     } else {
       image(starOutlineImg, sx, y + yOffset, starW, starH);
