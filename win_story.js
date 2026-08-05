@@ -123,11 +123,26 @@ function leaveWinStory() {
   cursor(ARROW);
 }
 
-// Skip → cut the narration and go straight to the credits card,
-// which still fades in at its own slow pace.
+// Skip → jump straight to the credits card. The narration isn't stopped,
+// it's fast-forwarded to the credits cue so the music keeps playing under
+// the card instead of cutting to silence.
 function skipWinStory() {
   if (winStoryEntering) return;
-  stopWinStoryAudio();
+
+  const creditsCue = WIN_STORY_PANEL_CUES[WIN_STORY_PANEL_COUNT - 1];
+
+  if (winStoryAudio && winStoryAudio.isLoaded()) {
+    if (winStoryAudio.isPlaying()) {
+      winStoryAudio.jump(creditsCue);
+    } else {
+      winStoryAudio.setVolume(WIN_STORY_NARRATION_VOLUME);
+      winStoryAudio.play();
+      winStoryAudio.jump(creditsCue);
+    }
+  }
+
+  // Keep the fallback clock in sync in case the audio never loaded.
+  winStoryClockStart = millis() - creditsCue * 1000;
 
   winStoryPage = WIN_STORY_PAGES.length - 1;
   for (let i = 0; i < WIN_STORY_PANEL_COUNT - 1; i++) {
@@ -226,7 +241,8 @@ function drawWinStoryScreen() {
 
   // --- REVEAL ---
   if (winStorySkipped) {
-    // Skip mode: narration is stopped, just fade the credits card in.
+    // Skipped: the narration is already fast-forwarded to the credits cue,
+    // so just fade the credits card in over it.
     const last = WIN_STORY_PANEL_COUNT - 1;
     winStoryPanelAlphas[last] = min(
       255,
