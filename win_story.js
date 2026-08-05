@@ -91,7 +91,6 @@ function advanceWinStory() {
     return;
   }
 
-  storyPage++;
   winStoryPage++;
   for (const p of WIN_STORY_PAGES[winStoryPage]) winStoryPanelAlphas[p] = 255;
   winStoryRevealTimer = WIN_STORY_SECOND_DELAY;
