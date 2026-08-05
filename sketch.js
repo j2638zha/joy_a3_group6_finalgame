@@ -50,7 +50,6 @@ let resumeBtnPressed = false;
 let restartBtnPressed = false;
 let homeBtnPressed = false;
 
-
 // Background stuff
 const VIEW_W = 1200;
 const VIEW_H = 780;
@@ -60,7 +59,7 @@ const SETTINGS_BTN = {
   x: VIEW_W - 130,
   y: 20,
   w: 130,
-  h: 90
+  h: 90,
 };
 
 // Pause menu buttons
@@ -68,21 +67,21 @@ const PAUSE_RESUME_BTN = {
   x: VIEW_W / 2,
   y: 360,
   w: 340,
-  h: 70
+  h: 70,
 };
 
 const PAUSE_RESTART_BTN = {
   x: VIEW_W / 2,
   y: 455,
   w: 340,
-  h: 70
+  h: 70,
 };
 
 const PAUSE_HOME_BTN = {
   x: VIEW_W / 2,
   y: 550,
   w: 340,
-  h: 70
+  h: 70,
 };
 
 let WORLD_W;
@@ -357,10 +356,10 @@ const SPRITES = {
     scale: 0.6,
     currentFrame: 0,
 
-    cropLeft:   [20, 0, 0, 0, 0, 0],
-    cropRight:  [0, 0, 20, 40, 40, 60],
-    cropTop:    [0, 0, 15, 0, 0, 0],
-    cropBottom: [0, 0, 0, 0, 0, 0]
+    cropLeft: [20, 0, 0, 0, 0, 0],
+    cropRight: [0, 0, 20, 40, 40, 60],
+    cropTop: [0, 0, 15, 0, 0, 0],
+    cropBottom: [0, 0, 0, 0, 0, 0],
   },
 };
 
@@ -825,13 +824,13 @@ function setup() {
   loadLevel(1);
   unlockAudio();
 
-  goatDeathVideo = createVideo(['assets/videos/goat_death.mp4']);
+  goatDeathVideo = createVideo(["assets/videos/goat_death.mp4"]);
   goatDeathVideo.hide();
   goatDeathVideo.volume(0); // set >0 if you want the clip's own audio
-  creviceDeathVideo = createVideo(['assets/videos/crevice_death.mp4']);
+  creviceDeathVideo = createVideo(["assets/videos/crevice_death.mp4"]);
   creviceDeathVideo.hide();
   creviceDeathVideo.volume(0);
-  timeDeathVideo = createVideo(['assets/videos/time_death.mp4']);
+  timeDeathVideo = createVideo(["assets/videos/time_death.mp4"]);
   timeDeathVideo.hide();
   timeDeathVideo.volume(0);
 
@@ -1043,19 +1042,11 @@ function drawSettingsButton() {
   const drawW = SETTINGS_BTN.w * hoverScale;
   const drawH = SETTINGS_BTN.h * hoverScale;
 
-  const drawX =
-    SETTINGS_BTN.x - (drawW - SETTINGS_BTN.w) / 2;
+  const drawX = SETTINGS_BTN.x - (drawW - SETTINGS_BTN.w) / 2;
 
-  const drawY =
-    SETTINGS_BTN.y - (drawH - SETTINGS_BTN.h) / 2;
+  const drawY = SETTINGS_BTN.y - (drawH - SETTINGS_BTN.h) / 2;
 
-  image(
-    settingsButtonImg,
-    drawX,
-    drawY,
-    drawW,
-    drawH
-  );
+  image(settingsButtonImg, drawX, drawY, drawW, drawH);
 
   pop();
 }
@@ -1158,7 +1149,7 @@ function drawPauseMenu() {
     PAUSE_RESUME_BTN.y,
     PAUSE_RESUME_BTN.w,
     PAUSE_RESUME_BTN.h,
-    resumeBtnPressed
+    resumeBtnPressed,
   );
 
   const restartHovered = drawButton(
@@ -1167,7 +1158,7 @@ function drawPauseMenu() {
     PAUSE_RESTART_BTN.y,
     PAUSE_RESTART_BTN.w,
     PAUSE_RESTART_BTN.h,
-    restartBtnPressed
+    restartBtnPressed,
   );
 
   const homeHovered = drawButton(
@@ -1176,7 +1167,7 @@ function drawPauseMenu() {
     PAUSE_HOME_BTN.y,
     PAUSE_HOME_BTN.w,
     PAUSE_HOME_BTN.h,
-    homeBtnPressed
+    homeBtnPressed,
   );
 
   if (resumeHovered || restartHovered || homeHovered) {
@@ -1653,13 +1644,12 @@ function updateScreenSounds() {
 // itself is paused during the first few tutorial cards (tutorialIndex
 // 0-3 — see the pause logic in drawTimer()).
 function updateTimerSound() {
-
   if (isGamePaused) {
-  if (timerSound && timerSound.isPlaying()) {
-    timerSound.stop();
-  }
+    if (timerSound && timerSound.isPlaying()) {
+      timerSound.stop();
+    }
 
-  return;
+    return;
   }
 
   if (!timerSound || !timerSound.isLoaded()) return;
@@ -1813,49 +1803,46 @@ function draw() {
   // GAMEPLAY
   // -------------------------
   if (gameEnded) {
-  gameState = "loss";
-  drawLossScreen();
+    gameState = "loss";
+    drawLossScreen();
 
-  if (debugMode) {
-    drawDebugPanel();
+    if (debugMode) {
+      drawDebugPanel();
+    }
+
+    return;
   }
 
-  return;
-}
+  if (!timerStarted) {
+    timerStarted = true;
+    startTime = millis();
+  }
 
-if (!timerStarted) {
-  timerStarted = true;
-  startTime = millis();
-}
-
-// Only update gameplay when the pause menu is closed.
-if (!isGamePaused) {
-  handleInput();
-  updateWalkSound();
-  animateSprite();
-  updateCamera();
-  updateStompAnimation();
-  checkFishCollision();
-  checkHoleCollision();
-  updateTutorialComeFindMeSound();
-} else {
-  player.isMoving = false;
-}
+  // Only update gameplay when the pause menu is closed.
+  if (!isGamePaused) {
+    handleInput();
+    updateWalkSound();
+    animateSprite();
+    updateCamera();
+    updateStompAnimation();
+    checkFishCollision();
+    checkHoleCollision();
+    updateTutorialComeFindMeSound();
+  } else {
+    player.isMoving = false;
+  }
 
   // ---------------- GOAT INIT (only for Level 3) ----------------
-  if (
-  !isGamePaused &&
-  currentLevel === 3 &&
-  !goatInitialized
-) {
-  goatInitialized = true;
-  goatStartTime = millis();
-  goatDirection = random(["left", "right"]);
-}
+  if (!isGamePaused && currentLevel === 3 && !goatInitialized) {
+    goatInitialized = true;
+    goatStartTime = millis();
+    goatDirection = random(["left", "right"]);
+  }
 
   // While the penguin is falling/shaking/climbing in a hole, skip the
   // top-exit fish gate and the win check — those only apply to normal play.
-if (!isGamePaused && holeState === "none") {    // --- BLOCK TOP EXIT IF FISH NOT COLLECTED ---
+  if (!isGamePaused && holeState === "none") {
+    // --- BLOCK TOP EXIT IF FISH NOT COLLECTED ---
     if (!fish.collected && player.y < finishY) {
       player.y = finishY;
       // trigger popup message
@@ -1901,20 +1888,20 @@ if (!isGamePaused && holeState === "none") {    // --- BLOCK TOP EXIT IF FISH NO
   }
 
   // WAVE DELAY + WAVE UPDATE
-if (!isGamePaused) {
-  if (waveDelayActive) {
-    waveDelay--;
+  if (!isGamePaused) {
+    if (waveDelayActive) {
+      waveDelay--;
 
-    if (waveDelay <= 0) {
-      waveDelayActive = false;
-      startWaveForFrame(4);
+      if (waveDelay <= 0) {
+        waveDelayActive = false;
+        startWaveForFrame(4);
+      }
+    }
+
+    if (waveActive) {
+      updateWave();
     }
   }
-
-  if (waveActive) {
-    updateWave();
-  }
-}
 
   // DRAW WORLD
   push();
@@ -1942,32 +1929,32 @@ if (!isGamePaused) {
 
   // ---------------- GOAT UPDATE ----------------
   if (currentLevel === 3) {
-  if (!isGamePaused) {
-    updateLevel3Goat();
-  }
+    if (!isGamePaused) {
+      updateLevel3Goat();
+    }
 
-  drawGoatHitbox();
+    drawGoatHitbox();
   }
 
   // ---------------- HOLE FALL / SHAKE / CLIMB SEQUENCE ----------------
   if (holeState === "falling") {
-  if (!isGamePaused) {
-    updateHoleFall();
-  }
+    if (!isGamePaused) {
+      updateHoleFall();
+    }
 
-  drawHoleFallAnimation();
-} else if (holeState === "shaking") {
-  if (!isGamePaused) {
-    updateHoleShake();
-  }
+    drawHoleFallAnimation();
+  } else if (holeState === "shaking") {
+    if (!isGamePaused) {
+      updateHoleShake();
+    }
 
-  // Penguin stays hidden during the shake.
-} else if (holeState === "climbing") {
-  drawHoleClimbAnimation();
-} else {
-  drawCharacterOnScreen();
-  drawPenguinHitbox();
-}
+    // Penguin stays hidden during the shake.
+  } else if (holeState === "climbing") {
+    drawHoleClimbAnimation();
+  } else {
+    drawCharacterOnScreen();
+    drawPenguinHitbox();
+  }
 
   // Capture world frame for X-ray ring — only needed while the wave/X-ray
   // ring is actually active. get() does a full-canvas pixel readback, so
@@ -2098,14 +2085,14 @@ if (!isGamePaused) {
     }
   }
 
-    // Draw this LAST so it stays above the gameplay.
+  // Draw this LAST so it stays above the gameplay.
   if (debugMode) {
     drawDebugPanel();
   }
 
   // Draw this after all gameplay so it appears above everything.
   if (isGamePaused) {
-  drawPauseMenu();
+    drawPauseMenu();
   }
 }
 
@@ -2190,22 +2177,22 @@ function keyPressed() {
   }
 
   // ESC opens and closes the pause menu during gameplay.
-if (gameState === "playing" && keyCode === ESCAPE) {
-  playButtonClickSound();
+  if (gameState === "playing" && keyCode === ESCAPE) {
+    playButtonClickSound();
 
-  if (isGamePaused) {
-    closePauseMenu();
-  } else {
-    openPauseMenu();
+    if (isGamePaused) {
+      closePauseMenu();
+    } else {
+      openPauseMenu();
+    }
+
+    return false;
   }
 
-  return false;
-}
-
-// Block all other keyboard gameplay input while paused.
-if (gameState === "playing" && isGamePaused) {
-  return false;
-}
+  // Block all other keyboard gameplay input while paused.
+  if (gameState === "playing" && isGamePaused) {
+    return false;
+  }
 
   // STORY SCREEN → ENTER → next panel / leave
   if (gameState === "story" && keyCode === ENTER) {
@@ -2413,12 +2400,12 @@ function drawTimer() {
   if (
     timerStarted &&
     !isGamePaused &&
-    (
-      (tutorialActive && tutorialIndex < 3) ||
+    ((tutorialActive && tutorialIndex < 3) ||
       level2CardActive ||
-      level3CardActive
-    )
-  ) { startTime += deltaTime;}
+      level3CardActive)
+  ) {
+    startTime += deltaTime;
+  }
   let elapsed = 0;
 
   if (timerStarted) {
@@ -2525,9 +2512,13 @@ function updateWalkSound() {
 
 function handleInput() {
   // --- STOMP ---
+  // Stomp is only allowed during normal gameplay.
+  // holeState must be "none", so the penguin cannot stomp while
+  // falling, shaking, or climbing out of a hole.
   if (
     keyIsDown(32) &&
     !stompAnimating &&
+    holeState === "none" &&
     !tutorialActive &&
     !level2CardActive &&
     !level3CardActive
@@ -2537,33 +2528,33 @@ function handleInput() {
     stompFrameTimer = 0;
     waveDelay = 0;
     waveDelayActive = false;
+
     totalTime = max(0, totalTime - 45);
     flashTimer = 150;
 
     // --- STOMP SOUND ---
     blockFishSounds = true;
 
-    // Stop any fish-search audio already playing so the stomp sound
-    // (and the single fishCallFar[1] ping that follows it) are the only
-    // non-music sounds heard during the stomp.
-    if (fishCallNear && fishCallNear.isPlaying()) fishCallNear.stop();
+    // Stop any fish-search audio already playing.
+    if (fishCallNear && fishCallNear.isPlaying()) {
+      fishCallNear.stop();
+    }
+
     for (const clip of fishCallFar) {
-      if (clip && clip.isPlaying()) clip.stop();
+      if (clip && clip.isPlaying()) {
+        clip.stop();
+      }
     }
 
     if (stompSound && stompSound.isLoaded()) {
       stompSound.play();
       stompSound.onended(playStompFishCall);
     } else {
-      // no stomp sound available — still let the fish ping happen
       playStompFishCall();
     }
   }
 
-  // Penguin is fully frozen while any tutorial card is on screen —
-  // including the last (space dialogue) card. Movement is allowed
-  // only when tutorialActive is false, i.e. normal play and the gap
-  // between the flashlight card and the space card.
+  // Freeze the penguin while tutorial cards are open.
   if (tutorialActive) {
     player.isMoving = false;
     return;
@@ -2579,13 +2570,17 @@ function handleInput() {
     return;
   }
 
-  // Movement AND stomp are disabled the entire time the penguin is
-  // falling / shaking / climbing in a hole.
+  // Disable movement and stomping throughout the entire hole sequence.
+  // This includes:
+  // "falling"
+  // "shaking"
+  // "climbing"
   if (holeState !== "none") {
     player.isMoving = false;
     return;
   }
 
+  // Freeze normal movement while the stomp animation is playing.
   if (stompAnimating) {
     player.isMoving = false;
     return;
@@ -2594,7 +2589,7 @@ function handleInput() {
   let newX = player.x;
   let newY = player.y;
 
-  // reset each frame
+  // Reset movement every frame.
   player.isMoving = false;
 
   const W = keyIsDown(87) || keyIsDown(UP_ARROW);
@@ -2602,74 +2597,89 @@ function handleInput() {
   const S = keyIsDown(83) || keyIsDown(DOWN_ARROW);
   const D = keyIsDown(68) || keyIsDown(RIGHT_ARROW);
 
-  // --- FIRST GOAT TUTORIAL TRIGGER (LEVEL 3) ---
+  // --- FIRST GOAT TUTORIAL TRIGGER — LEVEL 3 ---
   if (currentLevel === 3 && W && !goatHasKilledOnce && !goatTriggered) {
     goatTriggered = true;
     goatTriggerTime = millis();
   }
 
-  // --- DIAGONALS FIRST ---
+  // --- DIAGONAL MOVEMENT ---
   if (W && D) {
     newX += player.speed;
     newY -= player.speed;
+
     player.direction = "wd";
     player.isMoving = true;
   } else if (A && W) {
     newX -= player.speed;
     newY -= player.speed;
+
     player.direction = "aw";
     player.isMoving = true;
   } else if (S && D) {
     newX += player.speed;
     newY += player.speed;
+
     player.direction = "sd";
     player.isMoving = true;
   } else if (A && S) {
     newX -= player.speed;
     newY += player.speed;
+
     player.direction = "as";
     player.isMoving = true;
   }
 
-  // --- CARDINAL DIRECTIONS ---
+  // --- CARDINAL MOVEMENT ---
   else if (W) {
     newY -= player.speed;
+
     player.direction = "up";
     player.isMoving = true;
   } else if (S) {
     newY += player.speed;
+
     player.direction = "down";
     player.isMoving = true;
   } else if (A) {
     newX -= player.speed;
+
     player.direction = "left";
     player.isMoving = true;
   } else if (D) {
     newX += player.speed;
+
     player.direction = "right";
     player.isMoving = true;
   }
 
+  // Keep the penguin inside the world.
   if (WORLD_W_SCALED && WORLD_H_SCALED) {
     newX = constrain(newX, player.w / 2, WORLD_W_SCALED - player.w / 2);
+
     newY = min(newY, WORLD_H_SCALED - player.h / 2);
   }
 
-  // collision radius
+  // Collision radius.
   let r = player.w * 0.45;
 
-  // three collision test points (world space)
+  // Three collision test points in world space.
   let topX = newX;
   let topY = newY - r;
+
   let leftX = newX - r;
   let leftY = newY;
+
   let rightX = newX + r;
   let rightY = newY;
 
+  // Check collisions with diagonal walls.
   for (let w of walls) {
     function crossed(px, py) {
       let d0 = pointSide(player.x, player.y, w.x1, w.y1, w.x2, w.y2);
+
       let d1 = pointSide(px, py, w.x1, w.y1, w.x2, w.y2);
+
       return d0 * d1 < 0;
     }
 
@@ -2681,23 +2691,25 @@ function handleInput() {
       let mx = newX - player.x;
       let my = newY - player.y;
 
-      // compute wall normal
+      // Compute the wall normal.
       let nx = w.y2 - w.y1;
       let ny = -(w.x2 - w.x1);
 
-      // normalize
+      // Normalize it.
       let len = Math.hypot(nx, ny);
+
       nx /= len;
       ny /= len;
 
-      // ⭐ ensure normal faces the player
+      // Make sure the normal faces the player.
       let side = pointSide(player.x, player.y, w.x1, w.y1, w.x2, w.y2);
+
       if (side < 0) {
         nx = -nx;
         ny = -ny;
       }
 
-      // dot > 0 means movement is toward the wall
+      // dot > 0 means the player is moving toward the wall.
       let dot = mx * nx + my * ny;
 
       if (dot > 0) {
@@ -2712,10 +2724,14 @@ function handleInput() {
     }
   }
 
+  // Move horizontally one pixel at a time so the penguin
+  // does not move through walls or spikes.
   let dx = newX - player.x;
   let stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
+
   for (let i = 0; i < Math.abs(dx); i++) {
     let testX = player.x + stepX;
+
     if (
       !wouldCollideWithSpike(testX, player.y) &&
       isLegalPosition(testX, player.y)
@@ -2725,10 +2741,14 @@ function handleInput() {
       break;
     }
   }
+
+  // Move vertically one pixel at a time.
   let dy = newY - player.y;
   let stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1;
+
   for (let i = 0; i < Math.abs(dy); i++) {
     let testY = player.y + stepY;
+
     if (
       !wouldCollideWithSpike(player.x, testY) &&
       isLegalPosition(player.x, testY)
@@ -2857,31 +2877,60 @@ function enterHole(h) {
   holeState = "falling";
   activeHole = h;
 
+  // Cancel any stomp that began on the same frame
+  // that the penguin touched the hole.
+  stompAnimating = false;
+  stompFrame = 0;
+  stompFrameTimer = 0;
+
+  // Cancel the stomp shockwave.
+  waveActive = false;
+  waveRadius = 200;
+  waveDelay = 0;
+  waveDelayActive = false;
+
+  // Allow fish sounds to work normally again after the cancelled stomp.
+  blockFishSounds = false;
+
+  // Stop stomp sounds immediately.
+  if (stompSound && stompSound.isPlaying()) {
+    stompSound.stop();
+  }
+
+  if (stompAura && stompAura.isPlaying()) {
+    stompAura.stop();
+  }
+
+  // Lock the penguin to the middle of the active hole.
   player.x = h.x;
   player.y = h.y;
   player.isMoving = false;
 
+  // Reset the falling animation.
   holeFallFrame = 0;
   holeFallFrameTimer = 0;
 
-  // Compute the CURRENT displayed time-left (same math as drawTimer())
-  // before applying the penalty, so we check the real clock, not
-  // totalTime in isolation.
+  // Calculate the time currently displayed by the timer.
   let elapsed = 0;
+
   if (timerStarted) {
     elapsed = floor((millis() - startTime) / 1000);
   }
+
   const currentTimeLeft = totalTime - elapsed;
+
   const wouldGoNegative = currentTimeLeft - HOLE_TIME_PENALTY <= 0;
 
+  // Apply the hole penalty.
   totalTime = max(0, totalTime - HOLE_TIME_PENALTY);
+
   flashTimer = HOLE_TIMER_FLASH_FRAMES;
 
+  // Falling into the hole causes a loss if no time remains.
   if (wouldGoNegative) {
     triggerLoss("hole");
   }
 }
-
 // Advances the fall animation; once the last frame has played, moves on
 // to the screen-shake stage.
 function updateHoleFall() {
@@ -3244,11 +3293,7 @@ function mousePressed() {
   }
 
   // Open the pause menu from the settings button.
-  if (
-    gameState === "playing" &&
-    !isGamePaused &&
-    isSettingsButtonHovered()
-  ) {
+  if (gameState === "playing" && !isGamePaused && isSettingsButtonHovered()) {
     playButtonClickSound();
     openPauseMenu();
     return;
@@ -3268,7 +3313,7 @@ function mousePressed() {
   }
 
   if (handleTutorialMousePressed()) return;
-  
+
   if (handleLevel2CardMousePressed()) return;
 
   if (handleLevel3CardMousePressed()) return;
@@ -3317,7 +3362,7 @@ function mousePressed() {
   }
 
   // --- LOSS SCREEN BUTTON ---
-  if (gameState === "loss" && lossVideoFinished){
+  if (gameState === "loss" && lossVideoFinished) {
     let bx = width / 2 + 400;
     let by = height * 0.55;
     let bw = 320;
@@ -3358,42 +3403,32 @@ function mousePressed() {
 }
 
 function mouseReleased() {
-
   // Pause-menu button releases.
-if (gameState === "playing" && isGamePaused) {
-  if (
-    resumeBtnPressed &&
-    pointInsidePauseButton(PAUSE_RESUME_BTN)
-  ) {
-    playButtonClickSound();
-    closePauseMenu();
+  if (gameState === "playing" && isGamePaused) {
+    if (resumeBtnPressed && pointInsidePauseButton(PAUSE_RESUME_BTN)) {
+      playButtonClickSound();
+      closePauseMenu();
+      return;
+    }
+
+    if (restartBtnPressed && pointInsidePauseButton(PAUSE_RESTART_BTN)) {
+      playButtonClickSound();
+      restartCurrentLevel();
+      return;
+    }
+
+    if (homeBtnPressed && pointInsidePauseButton(PAUSE_HOME_BTN)) {
+      playButtonClickSound();
+      returnToHomeFromPause();
+      return;
+    }
+
+    resumeBtnPressed = false;
+    restartBtnPressed = false;
+    homeBtnPressed = false;
+
     return;
   }
-
-  if (
-    restartBtnPressed &&
-    pointInsidePauseButton(PAUSE_RESTART_BTN)
-  ) {
-    playButtonClickSound();
-    restartCurrentLevel();
-    return;
-  }
-
-  if (
-    homeBtnPressed &&
-    pointInsidePauseButton(PAUSE_HOME_BTN)
-  ) {
-    playButtonClickSound();
-    returnToHomeFromPause();
-    return;
-  }
-
-  resumeBtnPressed = false;
-  restartBtnPressed = false;
-  homeBtnPressed = false;
-
-  return;
-}
 
   // --- TUTORIAL MOUSE INPUT (tutorial_cards.js) ---
   if (handleTutorialMouseReleased()) return;

@@ -25,9 +25,9 @@ const LEVEL2_HOLES = [
 // Walk the penguin to a spot, read "Player: x, y" in the corner of the
 // screen, then add {x, y} here.
 const LEVEL2_FISH_SPAWNS = [
-    { x: 942, y: 859},
-    { x: 601, y: 646},
-    { x: 87, y: 1180},
+  { x: 942, y: 859 },
+  { x: 601, y: 646 },
+  { x: 87, y: 1180 },
 ];
 
 let avalancheCard2;
@@ -70,15 +70,15 @@ function handleLevel2CardMousePressed() {
 
   level2CardStep++;
 
-if (level2CardStep >= 2) {
-  level2CardActive = false;
+  if (level2CardStep >= 2) {
+    level2CardActive = false;
 
-  startTime = millis();
-  timerStarted = true;
+    startTime = millis();
+    timerStarted = true;
 
-  gameState = "playing";
-  cursor(ARROW);
-} else {
+    gameState = "playing";
+    cursor(ARROW);
+  } else {
     playCardSwitchSound();
   }
 
@@ -98,109 +98,109 @@ function drawLevel2CardOverlay() {
 function getLevel2FishStart(WORLD_W_SCALED, WORLD_H_SCALED) {
   return {
     x: WORLD_W_SCALED / 2,
-    y: WORLD_H_SCALED / 2 + 700
+    y: WORLD_H_SCALED / 2 + 700,
   };
 }
 
 // Level 2's diagonal boundary walls. Add/remove/adjust as needed —
 // each wall is a straight line from (x1,y1) to (x2,y2).
 function buildLevel2Walls(WORLD_W_SCALED, WORLD_H_SCALED) {
-    return [
+  return [
     {
-        x1: 65,
-        y1: 1102,
-        x2: 341,
-        y2: 628
+      x1: 65,
+      y1: 1102,
+      x2: 341,
+      y2: 628,
     },
     {
-        x1:341,
-        y1: 628,
-        x2: 428,
-        y2: 551
+      x1: 341,
+      y1: 628,
+      x2: 428,
+      y2: 551,
     },
     {
-        x1: 755,
-        y1: 551,
-        x2: 857,
-        y2: 635
+      x1: 755,
+      y1: 551,
+      x2: 857,
+      y2: 635,
     },
     {
-        x1: 857,
-        y1: 635,
-        x2: 981,
-        y2: 836
+      x1: 857,
+      y1: 635,
+      x2: 981,
+      y2: 836,
     },
     {
-        x1: 1130,
-        y1: 1342,
-        x2: 1091,
-        y2: 1114
+      x1: 1130,
+      y1: 1342,
+      x2: 1091,
+      y2: 1114,
     },
     {
-        x1: 440,
-        y1: 530,
-        x2: 665,
-        y2: 530
-    }
-    ];
+      x1: 440,
+      y1: 530,
+      x2: 665,
+      y2: 530,
+    },
+  ];
 }
 
 // Spike placements for Level 2. variant: 0 = small, 1 = mid,
 // 2 = tall, 3 = double.
 const LEVEL2_SPIKES = [
   { x: 494, y: 1381, variant: 0 },
- { x: 619, y: 572, variant: 1 },
- { x: 565, y: 602, variant: 1 },
- { x: 517, y: 614, variant: 1 },
- { x: 519, y: 662, variant: 2 },
- { x: 551, y: 690, variant: 2 },
- { x: 588, y: 710, variant: 2 },
- { x: 633, y: 724, variant: 3 },
- { x: 683, y: 728, variant: 3 },
- { x: 729, y: 730, variant: 3 },
- { x: 738, y: 606, variant: 0 },
- { x: 466, y: 700, variant: 0 },
- { x: 503, y: 716, variant: 0 },
- { x: 340, y: 624, variant: 2 },
- { x: 533, y: 991, variant: 3 },
- { x: 525, y: 841, variant: 0 },
- { x: 711, y: 875, variant: 0 },
- { x: 240, y: 1053, variant: 1 },
- { x: 276, y: 1088, variant: 1 },
- { x: 303, y: 1126, variant: 1 },
- { x: 31, y: 1294, variant: 1 },
- { x: 70, y: 1300, variant: 1 },
- { x: 106, y: 1300, variant: 1 },
- { x: 142, y: 1300, variant: 1 },
- 
- { x: 1049, y: 1100, variant: 1 },
- { x: 1016, y: 1100, variant: 1 },
- { x: 991, y: 1100, variant: 1 },
- { x: 949, y: 1100, variant: 1 },
+  { x: 619, y: 572, variant: 1 },
+  { x: 565, y: 602, variant: 1 },
+  { x: 517, y: 614, variant: 1 },
+  { x: 519, y: 662, variant: 2 },
+  { x: 551, y: 690, variant: 2 },
+  { x: 588, y: 710, variant: 2 },
+  { x: 633, y: 724, variant: 3 },
+  { x: 683, y: 728, variant: 3 },
+  { x: 729, y: 730, variant: 3 },
+  { x: 738, y: 606, variant: 0 },
+  { x: 466, y: 700, variant: 0 },
+  { x: 503, y: 716, variant: 0 },
+  { x: 340, y: 624, variant: 2 },
+  { x: 533, y: 991, variant: 3 },
+  { x: 525, y: 841, variant: 0 },
+  { x: 711, y: 875, variant: 0 },
+  { x: 240, y: 1053, variant: 1 },
+  { x: 276, y: 1088, variant: 1 },
+  { x: 303, y: 1126, variant: 1 },
+  { x: 31, y: 1294, variant: 1 },
+  { x: 70, y: 1300, variant: 1 },
+  { x: 106, y: 1300, variant: 1 },
+  { x: 142, y: 1300, variant: 1 },
 
- { x: 911, y: 795, variant: 2 },
- { x: 876, y: 839, variant: 2 },
- { x: 851, y: 871, variant: 2 },
- { x: 845, y: 905, variant: 0 },
- { x: 817, y: 923, variant: 2 },
- { x: 794, y: 959, variant: 2 },
- { x: 768, y: 995, variant: 2 },
- { x: 739, y: 1037, variant: 2 },
- { x: 720, y: 1082, variant: 1 },
- { x: 698, y: 1128, variant: 1 },
- { x: 656, y: 1134, variant: 1 },
- { x: 604, y: 1146, variant: 1 },
- { x: 454, y: 1156, variant: 3 },
- { x: 704, y: 1360, variant: 3 },
- { x: 922, y: 991, variant: 1 },
- { x: 254, y: 746, variant: 1 },
- { x: 285, y: 789, variant: 1 },
- { x: 320, y: 827, variant: 1 },
- { x: 350, y: 871, variant: 1 },
- { x: 375, y: 923, variant: 1 },
- { x: 409, y: 965, variant: 1 },
- { x: 447, y: 1001, variant: 1 },
- { x: 489, y: 1015, variant: 1 },
+  { x: 1049, y: 1100, variant: 1 },
+  { x: 1016, y: 1100, variant: 1 },
+  { x: 991, y: 1100, variant: 1 },
+  { x: 949, y: 1100, variant: 1 },
+
+  { x: 911, y: 795, variant: 2 },
+  { x: 876, y: 839, variant: 2 },
+  { x: 851, y: 871, variant: 2 },
+  { x: 845, y: 905, variant: 0 },
+  { x: 817, y: 923, variant: 2 },
+  { x: 794, y: 959, variant: 2 },
+  { x: 768, y: 995, variant: 2 },
+  { x: 739, y: 1037, variant: 2 },
+  { x: 720, y: 1082, variant: 1 },
+  { x: 698, y: 1128, variant: 1 },
+  { x: 656, y: 1134, variant: 1 },
+  { x: 604, y: 1146, variant: 1 },
+  { x: 454, y: 1156, variant: 3 },
+  { x: 704, y: 1360, variant: 3 },
+  { x: 922, y: 991, variant: 1 },
+  { x: 254, y: 746, variant: 1 },
+  { x: 285, y: 789, variant: 1 },
+  { x: 320, y: 827, variant: 1 },
+  { x: 350, y: 871, variant: 1 },
+  { x: 375, y: 923, variant: 1 },
+  { x: 409, y: 965, variant: 1 },
+  { x: 447, y: 1001, variant: 1 },
+  { x: 489, y: 1015, variant: 1 },
 ];
 
 // How far above center the top boundary/camera limit sits for this
@@ -223,13 +223,6 @@ function drawLevel2Holes(scale = 1) {
     const h = LEVEL2_HOLES[i];
 
     // Center the hole on its x,y
-    image(
-      hole,
-      h.x - drawW / 2,
-      h.y - drawH / 2,
-      drawW,
-      drawH
-    );
+    image(hole, h.x - drawW / 2, h.y - drawH / 2, drawW, drawH);
   }
 }
-

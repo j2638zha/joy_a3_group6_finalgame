@@ -20,9 +20,9 @@ let level3CardActive = false;
 let level3CardStep = 0;
 
 let stopSignTimer = 0;
-const STOPSIGN_RISE_FRAMES = 20;  // rises up + fades in
-const STOPSIGN_HOLD_FRAMES = 90;  // stays fully visible (~1.5s)
-const STOPSIGN_FADE_FRAMES = 30;  // fades out
+const STOPSIGN_RISE_FRAMES = 20; // rises up + fades in
+const STOPSIGN_HOLD_FRAMES = 90; // stays fully visible (~1.5s)
+const STOPSIGN_FADE_FRAMES = 30; // fades out
 const STOPSIGN_TOTAL_FRAMES =
   STOPSIGN_RISE_FRAMES + STOPSIGN_HOLD_FRAMES + STOPSIGN_FADE_FRAMES;
 
@@ -43,7 +43,7 @@ function activateGoatRun() {
   if (goatSound && goatSound.isLoaded()) goatSound.play();
 
   if (goatHasKilledOnce) {
-   goatNextSpawnDelay = random(300, 900);  // more goats, faster
+    goatNextSpawnDelay = random(300, 900); // more goats, faster
     goatTriggerTime = millis();
   }
 }
@@ -127,17 +127,17 @@ function drawStopSignCard() {
     alpha = map(t, 0, 1, 255, 0);
     alpha = constrain(alpha, 0, 255);
   } else {
-  // Animation finished — end the Level 3 intro sequence.
-  level3CardActive = false;
+    // Animation finished — end the Level 3 intro sequence.
+    level3CardActive = false;
 
-  // Start the Level 3 timer only after every intro card is finished.
-  startTime = millis();
-  timerStarted = true;
+    // Start the Level 3 timer only after every intro card is finished.
+    startTime = millis();
+    timerStarted = true;
 
-  gameState = "playing";
-  cursor(ARROW);
-  return;
-}
+    gameState = "playing";
+    cursor(ARROW);
+    return;
+  }
 
   push();
   imageMode(CENTER);
@@ -495,12 +495,13 @@ function updateLevel3Goat() {
 
   // FIRST RUN: 1s after W press, randomized left/right
   if (!goatHasKilledOnce && goatTriggered && !goatActive) {
-    if (millis() - goatTriggerTime >= 150) { // earlier goat
+    if (millis() - goatTriggerTime >= 150) {
+      // earlier goat
       if (random() < 0.5) {
-        pendingGoatDirection = "right";      // run right
-        pendingGoatX = -200;                 // spawn on the left side
+        pendingGoatDirection = "right"; // run right
+        pendingGoatX = -200; // spawn on the left side
       } else {
-        pendingGoatDirection = "left";       // run left
+        pendingGoatDirection = "left"; // run left
         pendingGoatX = WORLD_W_SCALED + 200; // spawn on the right side
       }
       pendingGoatY = player.y;
@@ -515,13 +516,12 @@ function updateLevel3Goat() {
   // RETRY RUNS: goats spawn repeatedly every few seconds
   if (goatHasKilledOnce) {
     if (!goatActive && millis() - goatTriggerTime >= goatNextSpawnDelay) {
-
       // Random side
       if (random() < 0.5) {
-        pendingGoatDirection = "right";      // run right
-        pendingGoatX = -200;                 // left side
+        pendingGoatDirection = "right"; // run right
+        pendingGoatX = -200; // left side
       } else {
-        pendingGoatDirection = "left";       // run left
+        pendingGoatDirection = "left"; // run left
         pendingGoatX = WORLD_W_SCALED + 200; // right side
       }
 
@@ -601,26 +601,25 @@ function updateLevel3Goat() {
   // -------------------------
   // 5) COLLISION WITH PENGUIN
   // -------------------------
-// Use the same cfg, frameW, frameH already defined above
-let goatHitX = goatX;
-let goatHitY = goatY - frameH * cfg.scale;
-let goatHitW = frameW * cfg.scale;
-let goatHitH = frameH * cfg.scale;
+  // Use the same cfg, frameW, frameH already defined above
+  let goatHitX = goatX;
+  let goatHitY = goatY - frameH * cfg.scale;
+  let goatHitW = frameW * cfg.scale;
+  let goatHitH = frameH * cfg.scale;
 
+  // Penguin hitbox
+  let penguinHitX = player.x + PENGUIN_HITBOX.offsetX;
+  let penguinHitY = player.y + PENGUIN_HITBOX.offsetY;
+  let penguinHitW = PENGUIN_HITBOX.w;
+  let penguinHitH = PENGUIN_HITBOX.h;
 
-// Penguin hitbox
-let penguinHitX = player.x + PENGUIN_HITBOX.offsetX;
-let penguinHitY = player.y + PENGUIN_HITBOX.offsetY;
-let penguinHitW = PENGUIN_HITBOX.w;
-let penguinHitH = PENGUIN_HITBOX.h;
-
-// Overlap check
-if (
-  goatHitX < penguinHitX + penguinHitW &&
-  goatHitX + goatHitW > penguinHitX &&
-  goatHitY < penguinHitY + penguinHitH &&
-  goatHitY + goatHitH > penguinHitY
-) {
+  // Overlap check
+  if (
+    goatHitX < penguinHitX + penguinHitW &&
+    goatHitX + goatHitW > penguinHitX &&
+    goatHitY < penguinHitY + penguinHitH &&
+    goatHitY + goatHitH > penguinHitY
+  ) {
     if (goatSound && goatSound.isLoaded()) goatSound.play();
 
     triggerLoss("goat");
@@ -628,7 +627,7 @@ if (
 
     goatHasKilledOnce = true;
     goatActive = false;
-}
+  }
 
   // -------------------------
   // 6) DESPAWN WHEN OFF-SCREEN
