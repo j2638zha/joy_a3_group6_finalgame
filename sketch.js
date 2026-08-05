@@ -405,9 +405,19 @@ let lossVideoFinished = false;
 
 // Central place to trigger a loss with a cause attached
 function triggerLoss(cause) {
-  if (gameEnded) return; // don't re-trigger
+  if (gameEnded) return;
+
   deathCause = cause;
   gameEnded = true;
+
+  // Stop every part of the stomp immediately before the loss video.
+  cancelStompAudio();
+
+  player.isMoving = false;
+
+  if (walkSound && walkSound.isPlaying()) {
+    walkSound.stop();
+  }
 }
 
 // World-space Y where the penguin should spawn. This matches the
@@ -674,6 +684,42 @@ let ringOffsetY = -50;
 let stompOffsetX = -5;
 let stompOffsetY = 0;
 let blockFishSounds = false;
+let allowStompEndCallback = false;
+
+function cancelStompAudio() {
+  // Disable the callback BEFORE stopping stompSound.
+  // This prevents stompSound.stop() from triggering the fish response.
+  allowStompEndCallback = false;
+  blockFishSounds = false;
+
+  // Cancel the stomp animation.
+  stompAnimating = false;
+  stompFrame = 0;
+  stompFrameTimer = 0;
+
+  // Cancel any pending or active shockwave.
+  waveActive = false;
+  waveRadius = 0;
+  waveDelay = 0;
+  waveDelayActive = false;
+
+  // Stop the main stomping sound.
+  if (stompSound && stompSound.isPlaying()) {
+    stompSound.stop();
+  }
+
+  // Stop the shockwave/aura sound.
+  if (stompAura && stompAura.isPlaying()) {
+    stompAura.stop();
+  }
+
+  // Stop the fish response that normally plays after stomping.
+  const stompFishCall = fishCallFar[1];
+
+  if (stompFishCall && stompFishCall.isPlaying()) {
+    stompFishCall.stop();
+  }
+}
 
 // ROCKY SPIKES — generic hitbox/image config. Per-level spike
 // PLACEMENT (the x/y/variant list) lives in level_1.js etc, and
@@ -1564,15 +1610,41 @@ function updateTutorialComeFindMeSound() {
 
 // Fired once the stomp sound finishes playing (see handleInput()).
 function playStompFishCall() {
-  if (!blockFishSounds) return; // stomp already ended, don't fire late
-  const clip = fishCallFar[1]; // "shelby_imhere.mp3"
-  if (!clip || !clip.isLoaded()) return;
+  // Never play this sound after a loss or after the stomp was cancelled.
+  if (
+    !allowStompEndCallback ||
+    !blockFishSounds ||
+    gameEnded ||
+    gameState === "loss"
+  ) {
+    allowStompEndCallback = false;
+    return;
+  }
+
+  // This callback is only allowed to run once.
+  allowStompEndCallback = false;
+
+  const clip = fishCallFar[1];
+
+  if (!clip || !clip.isLoaded()) {
+    return;
+  }
 
   clip.setVolume(FISH_CALL_MAX_VOL);
   clip.play();
 
   const fadeDelayMs = max(0, clip.duration() - STOMP_FISHCALL_FADE_SEC) * 1000;
+
   setTimeout(() => {
+    // Do nothing if the player has lost since this timeout started.
+    if (gameEnded || gameState === "loss") {
+      if (clip.isPlaying()) {
+        clip.stop();
+      }
+
+      return;
+    }
+
     if (clip.isPlaying()) {
       clip.setVolume(0, STOMP_FISHCALL_FADE_SEC);
     }
@@ -1622,15 +1694,37 @@ function updateScreenSounds() {
 
   if (gameState === "win" && lastScreenSound !== "win") {
     lastScreenSound = "win";
-    if (stompSound && stompSound.isPlaying()) stompSound.stop();
-    if (walkSound && walkSound.isPlaying()) walkSound.stop();
-    if (goatSound && goatSound.isPlaying()) goatSound.stop();
-    if (winSound && winSound.isLoaded()) winSound.play();
+
+    cancelStompAudio();
+
+    if (walkSound && walkSound.isPlaying()) {
+      walkSound.stop();
+    }
+
+    if (goatSound && goatSound.isPlaying()) {
+      goatSound.stop();
+    }
+
+    if (winSound && winSound.isLoaded()) {
+      winSound.play();
+    }
   } else if (gameState === "loss" && lastScreenSound !== "loss") {
     lastScreenSound = "loss";
-    if (stompSound && stompSound.isPlaying()) stompSound.stop();
-    if (goatSound && goatSound.isPlaying()) goatSound.stop();
-    if (loseSound && loseSound.isLoaded()) loseSound.play();
+
+    // Final cleanup when the loss screen begins.
+    cancelStompAudio();
+
+    if (walkSound && walkSound.isPlaying()) {
+      walkSound.stop();
+    }
+
+    if (goatSound && goatSound.isPlaying()) {
+      goatSound.stop();
+    }
+
+    if (loseSound && loseSound.isLoaded()) {
+      loseSound.play();
+    }
   } else if (gameState !== "win" && gameState !== "loss") {
     lastScreenSound = "";
   }
@@ -2512,11 +2606,10 @@ function updateWalkSound() {
 
 function handleInput() {
   // --- STOMP ---
-  // Stomp is only allowed during normal gameplay.
-  // holeState must be "none", so the penguin cannot stomp while
-  // falling, shaking, or climbing out of a hole.
   if (
     keyIsDown(32) &&
+    !gameEnded &&
+    gameState !== "loss" &&
     !stompAnimating &&
     holeState === "none" &&
     !tutorialActive &&
@@ -2547,13 +2640,26 @@ function handleInput() {
     }
 
     if (stompSound && stompSound.isLoaded()) {
+      // Allow the callback only for this specific stomp.
+      allowStompEndCallback = true;
+
+      stompSound.onended(() => {
+        // Stopping the sound during a loss may still call onended().
+        // These checks prevent any post-stomp sound from playing.
+        if (!allowStompEndCallback || gameEnded || gameState === "loss") {
+          allowStompEndCallback = false;
+          return;
+        }
+
+        playStompFishCall();
+      });
+
       stompSound.play();
-      stompSound.onended(playStompFishCall);
     } else {
+      allowStompEndCallback = true;
       playStompFishCall();
     }
   }
-
   // Freeze the penguin while tutorial cards are open.
   if (tutorialActive) {
     player.isMoving = false;
@@ -3135,10 +3241,16 @@ function updateWave() {
 }
 
 function startWaveForFrame(frameIndex) {
+  // Do not start the wave or aura after the player loses.
+  if (gameEnded || gameState === "loss") {
+    waveActive = false;
+    waveDelayActive = false;
+    return;
+  }
+
   waveActive = true;
   waveRadius = 0;
 
-  // --- AURA SOUND (fires when the blue ring activates) ---
   if (stompAura && stompAura.isLoaded()) {
     stompAura.play();
   }

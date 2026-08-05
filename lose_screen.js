@@ -11,18 +11,23 @@ function drawLossScreen() {
 
   if (vid) {
     if (!lossVideoStarted) {
+      // Make absolutely sure no stomp audio remains before the video starts.
+      cancelStompAudio();
+
       vid.stop();
       vid.play();
       lossVideoStarted = true;
       lossVideoFinished = false;
+
       vid.onended(() => {
         lossVideoFinished = true;
       });
     }
+
     image(vid, 0, 0, width, height);
   } else {
     image(lossBg, 0, 0, width, height);
-    lossVideoFinished = true; // no video available — show buttons right away
+    lossVideoFinished = true;
   }
 
   // Hold off on the UI until the video has actually finished.
@@ -60,7 +65,23 @@ function drawLossScreen() {
   pop();
 
   let anyHover = false;
-  anyHover = drawButton("Try Again", width/2 + 400, height*0.55, 320, 64, lossBtnPressed) || anyHover;
-  anyHover = drawButton("Level Picker", width/2 + 400, height*0.65, 320, 56, levelPickerBtnPressed) || anyHover;
+  anyHover =
+    drawButton(
+      "Try Again",
+      width / 2 + 400,
+      height * 0.55,
+      320,
+      64,
+      lossBtnPressed,
+    ) || anyHover;
+  anyHover =
+    drawButton(
+      "Level Picker",
+      width / 2 + 400,
+      height * 0.65,
+      320,
+      56,
+      levelPickerBtnPressed,
+    ) || anyHover;
   cursor(anyHover ? HAND : ARROW);
 }
