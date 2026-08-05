@@ -1,6 +1,10 @@
-// win_story.js — post-win comic strip, same transition style as the intro story.
+// win_story.js — post-win comic strip + credits, narrated.
+// Reveal timing is driven by the narration track (same idea as story.js),
+// with a real-time fallback so it still works if the audio fails to load.
 
 let winStoryPanels = [];
+let winStoryAudio;
+
 let winStoryPage = 0;
 let winStoryPanelAlphas = [];
 let winStoryEntering = true;
@@ -8,19 +12,33 @@ let winStoryFadeToBlack = 0;
 let winStorySkipped = false;
 let winStoryZoom = 1;
 let winStoryLastPage = -1;
-let winStoryRevealTimer = 0;
+let winStoryClockStart = 0; // millis() when the reveal began (fallback clock)
 
 const WIN_STORY_PANEL_COUNT = 4;
-const WIN_STORY_BLACK_SPEED = 8;
-const WIN_STORY_FADE_SPEED = 12;
-const WIN_STORY_PANEL4_FADE = 4; // credits fades in slower
-const WIN_STORY_SECOND_DELAY = 60; // frames before the 2nd panel on a page fades in
-const WIN_STORY_AUTO_DELAY = 240; // frames to hold a full page before auto-turning (~4s)
-const WIN_STORY_ZOOM_START = 1.0;
-const WIN_STORY_ZOOM_MAX = 1.12;
-const WIN_STORY_ZOOM_SPEED = 0.0006;
 
-let winStoryAutoTimer = 0;
+// ------------------------------------------------------------
+// ⏱  TIMING — edit these to match the narration
+// ------------------------------------------------------------
+// Seconds into win_screen_story_audio.mp3 at which each panel starts
+// fading in. Panel 4 is the credits card and holds for the rest of the
+// track (which runs ~2:19 total).
+//   panel 1 → 0:02   panel 2 → 0:10   panel 3 → 0:16   panel 4 → 0:24
+const WIN_STORY_PANEL_CUES = [2, 10, 16, 24];
+
+// Fade speed = alpha added per frame (60fps). Lower = slower + smoother.
+const WIN_STORY_FADE_SPEED = 1.8; // ≈2.4s per panel
+const WIN_STORY_CREDITS_FADE = 1.0; // ≈4.3s for the credits card
+const WIN_STORY_BLACK_SPEED = 6; // entry fade-to-black
+
+const WIN_STORY_NARRATION_VOLUME = 3;
+
+// Corner rounding on the panels (px, clamped so it can't exceed half a side).
+const WIN_STORY_CORNER_RADIUS = 26;
+
+// Slow "Ken Burns" drift. Kept small so panels never overflow their slot.
+const WIN_STORY_ZOOM_START = 1.0;
+const WIN_STORY_ZOOM_MAX = 1.05;
+const WIN_STORY_ZOOM_SPEED = 0.00025;
 
 // Page layout: panels 1&2 together, panel 3 alone, panel 4 (credits) alone.
 const WIN_STORY_PAGES = [
@@ -35,17 +53,30 @@ function preloadWinStoryAssets() {
       "assets/images/win_screen_story_panel_" + (i + 1) + ".png",
     );
   }
+  winStoryAudio = loadSound("assets/sounds/win_screen_story_audio.mp3");
 }
 
 function beginWinStory() {
-  // Stop any gameplay sounds.
+  // Stop any gameplay / win-screen sounds.
   if (gameMusic && gameMusic.isPlaying()) gameMusic.stop();
   if (stompSound && stompSound.isPlaying()) stompSound.stop();
   if (stompAura && stompAura.isPlaying()) stompAura.stop();
   if (walkSound && walkSound.isPlaying()) walkSound.stop();
   if (winSound && winSound.isPlaying()) winSound.stop();
+  if (typeof cancelStompAudio === "function") cancelStompAudio();
+  if (goatSound && goatSound.isPlaying()) goatSound.stop();
+  if (timerSound && timerSound.isPlaying()) timerSound.stop();
+  if (fishCallNear && fishCallNear.isPlaying()) fishCallNear.stop();
+  for (const clip of fishCallFar || []) {
+    if (clip && clip.isPlaying()) clip.stop();
+  }
+
+  timerStarted = false;
+  isGamePaused = false;
 
   gameState = "win_story";
+  cursor(ARROW);
+
   winStoryPage = 0;
   winStoryPanelAlphas = new Array(WIN_STORY_PANEL_COUNT).fill(0);
   winStoryEntering = true;
@@ -53,8 +84,7 @@ function beginWinStory() {
   winStorySkipped = false;
   winStoryZoom = WIN_STORY_ZOOM_START;
   winStoryLastPage = -1;
-  winStoryRevealTimer = WIN_STORY_SECOND_DELAY;
-  winStoryAutoTimer = WIN_STORY_AUTO_DELAY;
+  winStoryClockStart = millis();
 }
 
 function isWinStoryLastPage() {
@@ -67,124 +97,165 @@ function winStoryPageFullyShown() {
   );
 }
 
-function leaveWinStory() {
-  gameState = "start";
-  musicGateOpen = false; // reset the title-screen music gate
+function winStoryPageOfPanel(panelIdx) {
+  for (let pg = 0; pg < WIN_STORY_PAGES.length; pg++) {
+    if (WIN_STORY_PAGES[pg].includes(panelIdx)) return pg;
+  }
+  return 0;
 }
 
+// Narration time if it's playing, otherwise a plain wall clock.
+function winStoryTime() {
+  if (winStoryAudio && winStoryAudio.isLoaded() && winStoryAudio.isPlaying()) {
+    return winStoryAudio.currentTime();
+  }
+  return (millis() - winStoryClockStart) / 1000;
+}
+
+function stopWinStoryAudio() {
+  if (winStoryAudio && winStoryAudio.isPlaying()) winStoryAudio.stop();
+}
+
+function leaveWinStory() {
+  stopWinStoryAudio();
+  gameState = "start";
+  musicGateOpen = false; // reset the title-screen music gate
+  cursor(ARROW);
+}
+
+// Skip → cut the narration and go straight to the credits card,
+// which still fades in at its own slow pace.
 function skipWinStory() {
   if (winStoryEntering) return;
-  // Jump to the credits page, show everything except credits instantly.
+  stopWinStoryAudio();
+
   winStoryPage = WIN_STORY_PAGES.length - 1;
-  for (let i = 0; i < WIN_STORY_PANEL_COUNT - 1; i++)
+  for (let i = 0; i < WIN_STORY_PANEL_COUNT - 1; i++) {
     winStoryPanelAlphas[i] = 255;
+  }
   winStoryPanelAlphas[WIN_STORY_PANEL_COUNT - 1] = 0;
   winStorySkipped = true;
 }
 
+// ENTER only does something on the credits card: it leaves.
 function advanceWinStory() {
   if (winStoryEntering) return;
-
-  if (isWinStoryLastPage()) {
-    for (const p of WIN_STORY_PAGES[winStoryPage]) winStoryPanelAlphas[p] = 255;
-    leaveWinStory();
-    return;
-  }
-
-  winStoryPage++;
-  for (const p of WIN_STORY_PAGES[winStoryPage]) winStoryPanelAlphas[p] = 255;
-  winStoryRevealTimer = WIN_STORY_SECOND_DELAY;
-  winStoryAutoTimer = WIN_STORY_AUTO_DELAY;
+  if (!isWinStoryLastPage()) return;
+  leaveWinStory();
 }
 
-const WIN_STORY_CONTINUE_BTN = { x: 0, y: 0, w: 260, h: 60 };
 const WIN_STORY_SKIP_BTN = { x: 0, y: 0, w: 160, h: 50 };
 const WIN_STORY_RESTART_BTN = { x: 0, y: 0, w: 320, h: 64 };
 
-function winStoryPageRect(slot, count) {
-  const pad = 24;
+// The box a panel is allowed to occupy. The image is then letterboxed
+// inside it using its own aspect ratio, so nothing ever gets squashed.
+function winStorySlotBox(slot, count) {
+  const pad = 36; // gap between the two stacked panels
   const topMargin = 40;
-  const bottomMargin = 110;
-  const aspect = 1.83;
+  const bottomMargin = 110; // room for the buttons
 
   const areaW = width - pad * 2;
   const areaH = height - topMargin - bottomMargin;
 
   if (count === 1) {
-    let w = min(areaW, areaH * aspect);
-    let h = w / aspect;
-    const x = (width - w) / 2;
-    const y = topMargin + (areaH - h) / 2;
-    return { x, y, w, h };
+    return { x: pad, y: topMargin, w: areaW, h: areaH };
   }
 
-  // two panels stacked vertically
   const cellH = (areaH - pad) / 2;
-  let w = min(areaW, cellH * aspect);
+  return {
+    x: pad,
+    y: topMargin + slot * (cellH + pad),
+    w: areaW,
+    h: cellH,
+  };
+}
+
+// Fit `img` inside `box` at its native aspect ratio (contain, never stretch).
+function winStoryFitRect(img, box) {
+  const aspect = img && img.height > 0 ? img.width / img.height : 1.83;
+
+  let w = box.w;
   let h = w / aspect;
-  const x = (width - w) / 2;
-  const totalH = h * 2 + pad;
-  const originY = topMargin + (areaH - totalH) / 2;
-  const y = originY + slot * (h + pad);
-  return { x, y, w, h };
+
+  if (h > box.h) {
+    h = box.h;
+    w = h * aspect;
+  }
+
+  return {
+    x: box.x + (box.w - w) / 2,
+    y: box.y + (box.h - h) / 2,
+    w,
+    h,
+  };
+}
+
+// Rounded-rect path built from arcTo so it works in every browser
+// (ctx.roundRect is newer and not universally available).
+function winStoryRoundedPath(ctx, x, y, w, h, r) {
+  r = min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 function drawWinStoryScreen() {
   background(0);
 
-  // --- ENTRY FADE-TO-BLACK ---
+  // --- ENTRY FADE-TO-BLACK, then start the narration ---
   if (winStoryEntering) {
     winStoryFadeToBlack += WIN_STORY_BLACK_SPEED;
     if (winStoryFadeToBlack >= 255) {
       winStoryEntering = false;
+      winStoryClockStart = millis();
+      if (
+        winStoryAudio &&
+        winStoryAudio.isLoaded() &&
+        !winStoryAudio.isPlaying()
+      ) {
+        winStoryAudio.setVolume(WIN_STORY_NARRATION_VOLUME);
+        winStoryAudio.play();
+      }
     }
     return;
   }
 
-  // --- FADE-IN LOGIC ---
-  const panels = WIN_STORY_PAGES[winStoryPage];
-
-  if (winStorySkipped && isWinStoryLastPage()) {
-    // Skip mode: just fade the credits panel in slowly.
+  // --- REVEAL ---
+  if (winStorySkipped) {
+    // Skip mode: narration is stopped, just fade the credits card in.
     const last = WIN_STORY_PANEL_COUNT - 1;
     winStoryPanelAlphas[last] = min(
       255,
-      winStoryPanelAlphas[last] + WIN_STORY_PANEL4_FADE,
+      winStoryPanelAlphas[last] + WIN_STORY_CREDITS_FADE,
     );
   } else {
-    // First panel fades in immediately.
-    winStoryPanelAlphas[panels[0]] = min(
-      255,
-      winStoryPanelAlphas[panels[0]] + WIN_STORY_FADE_SPEED,
-    );
-    // Second panel (if any) waits for the reveal timer.
-    if (panels.length > 1) {
-      if (winStoryRevealTimer > 0) {
-        winStoryRevealTimer--;
-      } else {
+    const t = winStoryTime();
+
+    // Newest panel whose cue has passed decides which page we're on.
+    let newest = 0;
+    for (let i = 0; i < WIN_STORY_PANEL_COUNT; i++) {
+      if (t >= WIN_STORY_PANEL_CUES[i]) newest = i;
+    }
+    const targetPage = winStoryPageOfPanel(newest);
+    if (targetPage > winStoryPage) winStoryPage = targetPage;
+
+    // Fade in every panel on this page whose cue has passed.
+    for (const p of WIN_STORY_PAGES[winStoryPage]) {
+      if (t >= WIN_STORY_PANEL_CUES[p]) {
         const step =
-          panels[1] === WIN_STORY_PANEL_COUNT - 1
-            ? WIN_STORY_PANEL4_FADE
+          p === WIN_STORY_PANEL_COUNT - 1
+            ? WIN_STORY_CREDITS_FADE
             : WIN_STORY_FADE_SPEED;
-        winStoryPanelAlphas[panels[1]] = min(
-          255,
-          winStoryPanelAlphas[panels[1]] + step,
-        );
+        winStoryPanelAlphas[p] = min(255, winStoryPanelAlphas[p] + step);
       }
     }
   }
 
-  // --- AUTO-ADVANCE (not on credits page) ---
-  if (winStoryPageFullyShown() && !isWinStoryLastPage()) {
-    winStoryAutoTimer--;
-    if (winStoryAutoTimer <= 0) {
-      winStoryPage++;
-      winStoryRevealTimer = WIN_STORY_SECOND_DELAY;
-      winStoryAutoTimer = WIN_STORY_AUTO_DELAY;
-    }
-  }
-
-  // --- ZOOM ---
+  // --- ZOOM (resets on each new page) ---
   if (winStoryPage !== winStoryLastPage) {
     winStoryZoom = WIN_STORY_ZOOM_START;
     winStoryLastPage = winStoryPage;
@@ -192,11 +263,13 @@ function drawWinStoryScreen() {
   winStoryZoom = min(WIN_STORY_ZOOM_MAX, winStoryZoom + WIN_STORY_ZOOM_SPEED);
 
   // --- DRAW PANELS ---
+  const panels = WIN_STORY_PAGES[winStoryPage];
   for (let slot = 0; slot < panels.length; slot++) {
     const idx = panels[slot];
     const img = winStoryPanels[idx];
     if (!img) continue;
-    const r = winStoryPageRect(slot, panels.length);
+
+    const r = winStoryFitRect(img, winStorySlotBox(slot, panels.length));
 
     const zw = r.w * winStoryZoom;
     const zh = r.h * winStoryZoom;
@@ -204,68 +277,53 @@ function drawWinStoryScreen() {
     const zy = r.y - (zh - r.h) / 2;
 
     push();
+    drawingContext.save();
+    winStoryRoundedPath(
+      drawingContext,
+      zx,
+      zy,
+      zw,
+      zh,
+      WIN_STORY_CORNER_RADIUS,
+    );
+    drawingContext.clip();
     tint(255, winStoryPanelAlphas[idx]);
     image(img, zx, zy, zw, zh);
+    noTint();
+    drawingContext.restore();
     pop();
   }
 
-  // --- BUTTONS ---
-  if (isWinStoryLastPage() && winStoryPageFullyShown()) {
-    // Credits page: show Restart Game button.
+  // --- BUTTONS: Skip while the story runs, Restart on the credits card ---
+  let anyHover = false;
+
+  if (isWinStoryLastPage()) {
     WIN_STORY_RESTART_BTN.x = width / 2;
     WIN_STORY_RESTART_BTN.y = height - 45;
-    drawButton(
-      "Restart Game",
-      WIN_STORY_RESTART_BTN.x,
-      WIN_STORY_RESTART_BTN.y,
-      WIN_STORY_RESTART_BTN.w,
-      WIN_STORY_RESTART_BTN.h,
-      false,
-    );
+    anyHover =
+      drawButton(
+        "Restart Game",
+        WIN_STORY_RESTART_BTN.x,
+        WIN_STORY_RESTART_BTN.y,
+        WIN_STORY_RESTART_BTN.w,
+        WIN_STORY_RESTART_BTN.h,
+        false,
+      ) || anyHover;
   } else {
-    // Non-credits pages: Continue + Skip.
-    WIN_STORY_CONTINUE_BTN.x = width - 150;
-    WIN_STORY_CONTINUE_BTN.y = height - 45;
-    drawButton(
-      "Continue",
-      WIN_STORY_CONTINUE_BTN.x,
-      WIN_STORY_CONTINUE_BTN.y,
-      WIN_STORY_CONTINUE_BTN.w,
-      WIN_STORY_CONTINUE_BTN.h,
-      false,
-    );
-
     WIN_STORY_SKIP_BTN.x = 120;
     WIN_STORY_SKIP_BTN.y = height - 42;
-    drawButton(
-      "Skip",
-      WIN_STORY_SKIP_BTN.x,
-      WIN_STORY_SKIP_BTN.y,
-      WIN_STORY_SKIP_BTN.w,
-      WIN_STORY_SKIP_BTN.h,
-      false,
-    );
-  }
-}
-
-function handleWinStoryClick() {
-  if (isWinStoryLastPage() && winStoryPageFullyShown()) {
-    if (winStoryHitButton(WIN_STORY_RESTART_BTN)) {
-      leaveWinStory();
-      return true;
-    }
-    return false;
+    anyHover =
+      drawButton(
+        "Skip",
+        WIN_STORY_SKIP_BTN.x,
+        WIN_STORY_SKIP_BTN.y,
+        WIN_STORY_SKIP_BTN.w,
+        WIN_STORY_SKIP_BTN.h,
+        false,
+      ) || anyHover;
   }
 
-  if (winStoryHitButton(WIN_STORY_CONTINUE_BTN)) {
-    advanceWinStory();
-    return true;
-  }
-  if (winStoryHitButton(WIN_STORY_SKIP_BTN)) {
-    skipWinStory();
-    return true;
-  }
-  return false;
+  cursor(anyHover ? HAND : ARROW);
 }
 
 function winStoryHitButton(b) {
@@ -275,4 +333,24 @@ function winStoryHitButton(b) {
     mouseY > b.y - b.h / 2 &&
     mouseY < b.y + b.h / 2
   );
+}
+
+function handleWinStoryClick() {
+  if (winStoryEntering) return true;
+
+  if (isWinStoryLastPage()) {
+    if (winStoryHitButton(WIN_STORY_RESTART_BTN)) {
+      if (typeof playButtonClickSound === "function") playButtonClickSound();
+      leaveWinStory();
+      return true;
+    }
+    return false;
+  }
+
+  if (winStoryHitButton(WIN_STORY_SKIP_BTN)) {
+    if (typeof playButtonClickSound === "function") playButtonClickSound();
+    skipWinStory();
+    return true;
+  }
+  return false;
 }

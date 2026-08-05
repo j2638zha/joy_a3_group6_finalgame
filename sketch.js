@@ -1692,25 +1692,12 @@ function updateFishCall() {
 }
 
 function updateScreenSounds() {
-  if (!audioUnlocked) return;
-  if (getAudioContext().state !== "running") return;
+  if (!audioUnlocked || getAudioContext().state !== "running") return;
 
-  const onWinScreen = gameState === "win" || gameState === "win_story";
-
-  if (onWinScreen && lastScreenSound !== "win") {
+  if (gameState === "win" && lastScreenSound !== "win") {
     lastScreenSound = "win";
 
-    if (typeof cancelStompAudio === "function") {
-      cancelStompAudio();
-    }
-
-    if (stompSound && stompSound.isPlaying()) {
-      stompSound.stop();
-    }
-
-    if (stompAura && stompAura.isPlaying()) {
-      stompAura.stop();
-    }
+    cancelStompAudio();
 
     if (walkSound && walkSound.isPlaying()) {
       walkSound.stop();
@@ -1726,17 +1713,8 @@ function updateScreenSounds() {
   } else if (gameState === "loss" && lastScreenSound !== "loss") {
     lastScreenSound = "loss";
 
-    if (typeof cancelStompAudio === "function") {
-      cancelStompAudio();
-    }
-
-    if (stompSound && stompSound.isPlaying()) {
-      stompSound.stop();
-    }
-
-    if (stompAura && stompAura.isPlaying()) {
-      stompAura.stop();
-    }
+    // Final cleanup when the loss screen begins.
+    cancelStompAudio();
 
     if (walkSound && walkSound.isPlaying()) {
       walkSound.stop();
@@ -1749,10 +1727,11 @@ function updateScreenSounds() {
     if (loseSound && loseSound.isLoaded()) {
       loseSound.play();
     }
-  } else if (!onWinScreen && gameState !== "loss") {
+  } else if (gameState !== "win" && gameState !== "loss") {
     lastScreenSound = "";
   }
 }
+
 // ------------------------------------------------------------
 // TIMER SOUND
 // ------------------------------------------------------------
@@ -1863,9 +1842,14 @@ function draw() {
     return;
   }
 
-  // FINAL STORY AFTER COMPLETING LEVEL 3
+  // ENDING STORY SCREEN (after Level 3)
   if (gameState === "win_story") {
     drawWinStoryScreen();
+
+    if (debugMode) {
+      drawDebugPanel();
+    }
+
     return;
   }
 
@@ -2006,14 +1990,9 @@ function draw() {
 
       tutorialActive = false;
       postTutorialTimerActive = false;
-
       queueLockBreak(currentLevel);
-
-      // Levels 1 and 2 show the regular win screen.
-// Level 3 shows the regular win screen first,
-// followed by the ending story afterward.
-gameState = "win";
-return;
+      gameState = "win";
+      return;
     }
   }
 
@@ -2226,123 +2205,114 @@ return;
   }
 }
 
-  function keyPressed() {
-    // ==========================================================
-    // DEBUG PANEL AND DEBUG SHORTCUTS
-    // ==========================================================
+function keyPressed() {
+  // ==========================================================
+  // DEBUG PANEL AND DEBUG SHORTCUTS
+  // ==========================================================
 
-    // D can always open or close the debug panel.
-    if (key === "y" || key === "Y") {
-      debugMode = !debugMode;
+  // D can always open or close the debug panel.
+  if (key === "y" || key === "Y") {
+    debugMode = !debugMode;
+    return;
+  }
+
+  // The remaining shortcuts only work while debug mode is open.
+  if (debugMode) {
+    // S = first/title page
+    if (key === "s" || key === "S") {
+      stopDebugSounds();
+
+      gameState = "start";
+      musicGateOpen = true;
+      gameEnded = false;
+      cursor(ARROW);
       return;
     }
 
-    // The remaining shortcuts only work while debug mode is open.
-    if (debugMode) {
-      // S = first/title page
-      if (key === "s" || key === "S") {
-        stopDebugSounds();
+    // P = level picker
+    if (key === "p" || key === "P") {
+      stopDebugSounds();
 
-        gameState = "start";
-        musicGateOpen = true;
-        gameEnded = false;
-        cursor(ARROW);
-        return;
-      }
-
-      // P = level picker
-      if (key === "p" || key === "P") {
-        stopDebugSounds();
-
-        gameState = "level_picker";
-        gameEnded = false;
-        timerStarted = false;
-        cursor(ARROW);
-        return;
-      }
-
-      // 1 = Level 1
-      if (key === "1") {
-        stopDebugSounds();
-        debugGoToLevel(1);
-        return;
-      }
-
-      // 2 = Level 2
-      if (key === "2") {
-        stopDebugSounds();
-        debugGoToLevel(2);
-        return;
-      }
-
-      // 3 = Level 3
-      if (key === "3") {
-        stopDebugSounds();
-        debugGoToLevel(3);
-        return;
-      }
-
-      // W = win screen
-      if (key === "w" || key === "W") {
-        stopDebugSounds();
-
-        gameEnded = false;
-        timerStarted = false;
-        gameState = "win";
-        cursor(ARROW);
-        return;
-      }
-
-      // L = lose screen
-      // L = lose screen (time death)
-      if (key === "l" || key === "L") {
-        stopDebugSounds();
-        stopLossVideos();
-        triggerLoss("time");
-        timerStarted = false;
-        gameState = "loss";
-        cursor(ARROW);
-        return;
-      }
-    }
-
-    // ESC opens and closes the pause menu during gameplay.
-    if (gameState === "playing" && keyCode === ESCAPE) {
-      playButtonClickSound();
-
-      if (isGamePaused) {
-        closePauseMenu();
-      } else {
-        openPauseMenu();
-      }
-
-      return false;
-    }
-
-    // Block all other keyboard gameplay input while paused.
-    if (gameState === "playing" && isGamePaused) {
-      return false;
-    }
-
-    // STORY SCREEN → ENTER → next panel / leave
-    if (gameState === "story" && keyCode === ENTER) {
-      advanceStory();
+      gameState = "level_picker";
+      gameEnded = false;
+      timerStarted = false;
+      cursor(ARROW);
       return;
     }
 
-    if (gameState === "win_story" && keyCode === ENTER) {
-      if (isWinStoryLastPage() && winStoryPageFullyShown()) {
-        leaveWinStory();
-      } else {
-        advanceWinStory();
-      }
+    // 1 = Level 1
+    if (key === "1") {
+      stopDebugSounds();
+      debugGoToLevel(1);
       return;
     }
 
-    winStoryPage++;
-    for (const p of WIN_STORY_PAGES[winStoryPage]) winStoryPanelAlphas[p] = 255;
-    winStoryRevealTimer = WIN_STORY_SECOND_DELAY;
-    winStoryAutoTimer = WIN_STORY_AUTO_DELAY;
+    // 2 = Level 2
+    if (key === "2") {
+      stopDebugSounds();
+      debugGoToLevel(2);
+      return;
+    }
+
+    // 3 = Level 3
+    if (key === "3") {
+      stopDebugSounds();
+      debugGoToLevel(3);
+      return;
+    }
+
+    // W = win screen
+    if (key === "w" || key === "W") {
+      stopDebugSounds();
+
+      gameEnded = false;
+      timerStarted = false;
+      gameState = "win";
+      cursor(ARROW);
+      return;
+    }
+
+    // L = lose screen
+    // L = lose screen (time death)
+    if (key === "l" || key === "L") {
+      stopDebugSounds();
+      stopLossVideos();
+      triggerLoss("time");
+      timerStarted = false;
+      gameState = "loss";
+      cursor(ARROW);
+      return;
+    }
+  }
+
+  // ESC opens and closes the pause menu during gameplay.
+  if (gameState === "playing" && keyCode === ESCAPE) {
+    playButtonClickSound();
+
+    if (isGamePaused) {
+      closePauseMenu();
+    } else {
+      openPauseMenu();
+    }
+
+    return false;
+  }
+
+  // Block all other keyboard gameplay input while paused.
+  if (gameState === "playing" && isGamePaused) {
+    return false;
+  }
+
+  // STORY SCREEN → ENTER → next panel / leave
+  if (gameState === "story" && keyCode === ENTER) {
+    advanceStory();
+    return;
+  }
+
+  // ENDING STORY SCREEN → ENTER → next page / leave
+  if (gameState === "win_story" && keyCode === ENTER) {
+    advanceWinStory();
+    return;
   }
 
   // START SCREEN → ENTER → STORY
@@ -2399,19 +2369,14 @@ return;
   // TUTORIAL INPUT (tutorial_cards.js)
   if (handleTutorialKeyPressed()) return;
 
-  // WIN SCREEN → ENTER → START
-  // WIN SCREEN → ENTER
+  // WIN SCREEN → ENTER → ending story (after Level 3) or Level Picker
   if (gameState === "win" && keyCode === ENTER) {
     playButtonClickSound();
-
     if (currentLevel === 3) {
-      // After viewing the Level 3 win screen, begin the ending story.
       beginWinStory();
     } else {
-      // Levels 1 and 2 behave normally.
-      startLevelPickerTransition();
+      startLevelPickerTransition(); // was: gameState = "start";
     }
-
     return;
   }
 
@@ -2645,7 +2610,8 @@ function updateWalkSound() {
     gameState === "loss" ||
     gameState === "transition" ||
     gameState === "level_picker" ||
-    gameState === "story";
+    gameState === "story" ||
+    gameState === "win_story";
 
   const walking =
     movementHeld &&
@@ -3666,17 +3632,17 @@ function mouseReleased() {
 
     if (levelPickerBtnPressed && lpHover) {
       playButtonClickSound();
-
       if (gameState === "win" && currentLevel === 3) {
-        // Level 3 win screen → ending story.
+        // Finished the last level → roll the ending story + credits.
+        levelPickerBtnPressed = false;
+        lossBtnPressed = false;
+        winBtnPressed = false;
         beginWinStory();
-      } else if (
-        (gameState === "win" && currentLevel === 1) ||
-        gameState === "loss"
-      ) {
+        return;
+      }
+      if ((gameState === "win" && currentLevel === 1) || gameState === "loss") {
         startLevelPickerTransition();
       } else {
-        // Normal Level 2 win-screen behaviour.
         gameState = "level_picker";
       }
     }
