@@ -17,6 +17,8 @@ let winStoryExiting = false; // running the slow end-of-movie fade to black
 let winStoryFadeOut = 0; // 0..255 black overlay on the way out
 let winStoryBlackHold = 0; // frames to sit on full black before leaving
 
+let winStoryShouldResetGame = false;
+
 const WIN_STORY_PANEL_COUNT = 4;
 
 // ------------------------------------------------------------
@@ -70,6 +72,8 @@ function preloadWinStoryAssets() {
 }
 
 function beginWinStory() {
+  winStoryShouldResetGame = false;
+
   // Stop any gameplay / win-screen sounds.
   if (gameMusic && gameMusic.isPlaying()) gameMusic.stop();
   if (stompSound && stompSound.isPlaying()) stompSound.stop();
@@ -156,10 +160,221 @@ function startWinStoryExit() {
   }
 }
 
+// ============================================================
+// FULL GAME RESET
+// Clears ALL progress so Restart Game truly starts from scratch.
+// ============================================================
+
+function resetWholeGameProgress() {
+  // ----------------------------------------------------------
+  // SCORES / TIMES
+  // ----------------------------------------------------------
+
+  bestStars.level1 = 0;
+  bestStars.level2 = 0;
+  bestStars.level3 = 0;
+
+  fastestTimes.level1 = null;
+  fastestTimes.level2 = null;
+  fastestTimes.level3 = null;
+
+  fastestTimesIsNew.level1 = false;
+  fastestTimesIsNew.level2 = false;
+  fastestTimesIsNew.level3 = false;
+
+  starsEarned = 0;
+  finalTime = null;
+
+  // ----------------------------------------------------------
+  // LEVEL COMPLETION / UNLOCKS
+  // ----------------------------------------------------------
+
+  level1Complete = false;
+  level2Complete = false;
+  level3Complete = false;
+
+  // Level 1 begins unlocked.
+  // Level 2 + Level 3 must be unlocked again normally.
+  unlockAnimPlayed = [true, false, false];
+
+  pendingUnlockIndex = -1;
+
+  lockBreakState = "idle";
+  lockBreakIndex = -1;
+  lockBreakT = 0;
+  lockBreakFrame = 0;
+  lockBreakFrameTimer = 0;
+  lockBreakHoldTimer = 0;
+
+  // ----------------------------------------------------------
+  // LEVEL PICKER UI
+  // ----------------------------------------------------------
+
+  currentLevel = 1;
+
+  activePanelIndex = -1;
+  nextPanelIndex = -1;
+  isClosingPanel = false;
+
+  infoOpen = false;
+  infoBoxX = INFO_CLOSED_X;
+
+  levelShake = [0, 0, 0];
+  playBtnPressed = [false, false, false];
+
+  for (let i = 0; i < levelPanels.length; i++) {
+    levelPanels[i].x = PANEL_CLOSED_X;
+    levelPanels[i].targetX = PANEL_CLOSED_X;
+    levelPanels[i].recordTime = "--:--";
+    levelPanels[i].starScore = "--";
+    levelPanels[i].playHover = false;
+  }
+
+  // ----------------------------------------------------------
+  // GAMEPLAY STATE
+  // ----------------------------------------------------------
+
+  gameEnded = false;
+  timerStarted = false;
+  startTime = 0;
+  finalTime = null;
+  flashTimer = 0;
+
+  isGamePaused = false;
+  pauseStartedAt = 0;
+
+  resumeBtnPressed = false;
+  restartBtnPressed = false;
+  homeBtnPressed = false;
+
+  startBtnPressed = false;
+  winBtnPressed = false;
+  lossBtnPressed = false;
+  levelPickerBtnPressed = false;
+
+  player.isMoving = false;
+
+  // ----------------------------------------------------------
+  // FISH / POPUPS
+  // ----------------------------------------------------------
+
+  fish.collected = false;
+
+  needFishMessageActive = false;
+  needFishMessageTimer = 0;
+
+  foundFishMessageActive = false;
+  foundFishMessageTimer = 0;
+
+  // ----------------------------------------------------------
+  // STOMP
+  // ----------------------------------------------------------
+
+  if (typeof cancelStompAudio === "function") {
+    cancelStompAudio();
+  }
+
+  stompAnimating = false;
+  stompFrame = 0;
+  stompFrameTimer = 0;
+
+  waveActive = false;
+  waveRadius = 0;
+  waveDelay = 0;
+  waveDelayActive = false;
+
+  // ----------------------------------------------------------
+  // HOLES
+  // ----------------------------------------------------------
+
+  holeState = "none";
+  activeHole = null;
+
+  holeFallFrame = 0;
+  holeFallFrameTimer = 0;
+  holeClimbFrame = 0;
+  holeEnterFrame = 0;
+
+  // ----------------------------------------------------------
+  // LEVEL 3 GOAT
+  // ----------------------------------------------------------
+
+  goatActive = false;
+  goatInitialized = false;
+  goatTriggered = false;
+  goatTriggerTime = 0;
+
+  goatHasKilledOnce = false;
+  goatNextSpawnDelay = 150;
+
+  goatFrameIndex = 0;
+  goatFrameTimer = 0;
+  goatX = 0;
+  goatY = 0;
+
+  // ----------------------------------------------------------
+  // LEVEL INTRO STATES
+  // ----------------------------------------------------------
+
+  level2CardActive = false;
+  level2CardStep = 0;
+
+  level3CardActive = false;
+  level3CardStep = 0;
+  stopSignTimer = 0;
+
+  // ----------------------------------------------------------
+  // TUTORIAL
+  // ----------------------------------------------------------
+
+  if (typeof resetTutorial === "function") {
+    resetTutorial();
+  }
+
+  // ----------------------------------------------------------
+  // AUDIO / VIDEOS
+  // ----------------------------------------------------------
+
+  if (typeof stopDebugSounds === "function") {
+    stopDebugSounds();
+  }
+
+  if (typeof stopLossVideos === "function") {
+    stopLossVideos();
+  }
+
+  lastScreenSound = "";
+
+  // ----------------------------------------------------------
+  // REBUILD LEVEL 1 SO THE NEXT RUN STARTS CLEAN
+  // ----------------------------------------------------------
+
+  loadLevel(1);
+  resetGame();
+
+  // resetGame() uses currentLevel, which is now Level 1.
+  currentLevel = 1;
+
+  // We want the player back at the TITLE SCREEN, not in gameplay.
+  timerStarted = false;
+  gameEnded = false;
+  finalTime = null;
+
+  musicGateOpen = false;
+}
+
 function leaveWinStory() {
   stopWinStoryAudio();
+
+  // Only wipe progress if the player actually clicked Restart Game.
+  if (winStoryShouldResetGame) {
+    resetWholeGameProgress();
+    winStoryShouldResetGame = false;
+  }
+
   gameState = "start";
-  musicGateOpen = false; // reset the title-screen music gate
+  musicGateOpen = false;
+
   cursor(ARROW);
 }
 
@@ -429,10 +644,19 @@ function handleWinStoryClick() {
 
   if (isWinStoryLastPage()) {
     if (winStoryHitButton(WIN_STORY_RESTART_BTN)) {
-      if (typeof playButtonClickSound === "function") playButtonClickSound();
+      if (typeof playButtonClickSound === "function") {
+        playButtonClickSound();
+      }
+
+      // This is a TRUE restart:
+      // scores, times and level unlocks will all be erased.
+      winStoryShouldResetGame = true;
+
       startWinStoryExit();
+
       return true;
     }
+
     return false;
   }
 

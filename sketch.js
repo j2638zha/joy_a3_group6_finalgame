@@ -21,8 +21,8 @@ let fishCollect;
 let goatSound;
 let timerSound;
 let buttonClickSound;
-let button1Sound;     // Used by level circles and How to Play X button
-let button2Sound;     // Used by How to Play, Try Again, and loss Level Picker
+let button1Sound; // Used by level circles and How to Play X button
+let button2Sound; // Used by How to Play, Try Again, and loss Level Picker
 let lockButtonSound;
 let fishCallFar = []; // "searching" clips — [0] = "come find me", [1] = "I'm here"
 let fishCallNear; // plays when penguin is close
@@ -493,16 +493,18 @@ function loadLevel(levelNum) {
     img = level3Bg;
     topOffset = LEVEL3_TOP_OFFSET;
   }
-  if (levelNum === 3) {
-    goatX = WORLD_W_SCALED / 2 - 200;
-    goatY = WORLD_H_SCALED / 2 + 200;
-  }
   bgImg = img;
   WORLD_W = img.width;
   WORLD_H = img.height;
   bgScale = Math.max(VIEW_W / WORLD_W, VIEW_H / WORLD_H);
   WORLD_W_SCALED = WORLD_W * bgScale;
   WORLD_H_SCALED = WORLD_H * bgScale;
+
+  if (levelNum === 3) {
+    goatX = WORLD_W_SCALED / 2 - 200;
+    goatY = WORLD_H_SCALED / 2 + 200;
+  }
+
   WORLD_TOP_LIMIT = WORLD_H_SCALED / 2 - topOffset;
   if (levelNum === 1) finishY = LEVEL1_FINISH_Y;
   else if (levelNum === 2) finishY = LEVEL2_FINISH_Y;
@@ -715,6 +717,10 @@ let waveDelayActive = false;
 let blueBuffer;
 let ringMaskBuffer;
 let blizzardBuffer; // reused every frame in drawBlizzardOverlay() — see setup()
+
+let baseWorldFrame = null;
+let waveNeedsCapture = false;
+
 let ringOffsetX = 0;
 let ringOffsetY = -50;
 let stompOffsetX = -5;
@@ -738,6 +744,9 @@ function cancelStompAudio() {
   waveRadius = 0;
   waveDelay = 0;
   waveDelayActive = false;
+
+  waveNeedsCapture = false;
+  baseWorldFrame = null;
 
   // Stop the main stomping sound.
   if (stompSound && stompSound.isPlaying()) {
@@ -1864,6 +1873,64 @@ function updateMusic() {
   }
 }
 
+// ============================================================
+// FINISH LINE
+// ============================================================
+
+function drawFinishLine() {
+  if (!WORLD_W_SCALED || finishY == null) return;
+
+  // Leave some space from the left and right edges of the mountain.
+  const margin = 90;
+
+  const x1 = margin;
+  const x2 = WORLD_W_SCALED - margin;
+
+  // Keep the line roughly the same visible thickness regardless of zoom.
+  const lineThickness = 10 / (camZoom * bgScale);
+
+  push();
+
+  // -------------------------
+  // RED FINISH LINE
+  // -------------------------
+  stroke(235, 45, 45);
+  strokeWeight(lineThickness);
+  strokeCap(SQUARE);
+
+  line(x1, finishY, x2, finishY);
+
+  // -------------------------
+  // WHITE DASHES
+  // Makes it look more like a race finish line.
+  // -------------------------
+  stroke(255);
+  strokeWeight(lineThickness * 0.45);
+
+  const dashLength = 28;
+  const gap = 25;
+
+  for (let x = x1; x < x2; x += dashLength + gap) {
+    line(x, finishY, min(x + dashLength, x2), finishY);
+  }
+
+  // -------------------------
+  // SMALL FINISH POSTS
+  // -------------------------
+  noStroke();
+
+  const postW = 10;
+  const postH = 55;
+
+  fill(235, 45, 45);
+
+  rect(x1 - postW / 2, finishY - postH / 2, postW, postH);
+
+  rect(x2 - postW / 2, finishY - postH / 2, postW, postH);
+
+  pop();
+}
+
 function draw() {
   // Update audio systems on every screen.
   updateMusic();
@@ -2065,6 +2132,8 @@ function draw() {
     );
   }
   drawBackground();
+  // Show exactly where the player needs to reach.
+  drawFinishLine();
   drawSpikes();
   drawHoles(HOLE_VISUAL_SCALE);
   drawFish();
@@ -2105,12 +2174,11 @@ function draw() {
     drawPenguinHitbox();
   }
 
-  // Capture world frame for X-ray ring — only needed while the wave/X-ray
-  // ring is actually active. get() does a full-canvas pixel readback, so
-  // doing it unconditionally every frame (as before) was wasted work the
-  // vast majority of the time.
-  if (waveActive) {
+  // Capture the world only once when the stomp wave begins.
+  // Do NOT call get() every frame — it creates a large new image every time.
+  if (waveActive && waveNeedsCapture) {
     baseWorldFrame = get();
+    waveNeedsCapture = false;
   }
 
   // BLIZZARD OVERLAY
@@ -2122,38 +2190,49 @@ function draw() {
     drawEnterButtonAtHole();
   }
 
-  // X-RAY RING
-  if (waveActive) {
-    ringMaskBuffer.clear();
-    ringMaskBuffer.noStroke();
+  // ============================================================
+  // X-RAY RING — MEMORY-SAFE VERSION
+  // ============================================================
 
+  if (waveActive && baseWorldFrame) {
     const cx = (player.x - camX) * camZoom * bgScale + ringOffsetX;
+
     const cy = (player.y - camY) * camZoom * bgScale + ringOffsetY;
 
-    const outerRadius = waveRadius;
-    const innerRadius = waveRadius - 140;
-
-    ringMaskBuffer.fill(255);
-    ringMaskBuffer.circle(cx, cy, outerRadius * 2);
-
-    if (innerRadius > 0) {
-      ringMaskBuffer.erase();
-      ringMaskBuffer.circle(cx, cy, innerRadius * 2);
-      ringMaskBuffer.noErase();
-    }
-
-    blueBuffer.clear();
-    blueBuffer.image(baseWorldFrame, 0, 0);
-
-    let maskedBlue = blueBuffer.get();
-    maskedBlue.mask(ringMaskBuffer);
+    const outerRadius = max(0, waveRadius);
+    const innerRadius = max(0, waveRadius - 140);
 
     let fade = map(waveRadius, waveMaxRadius * 0.7, waveMaxRadius, 255, 0);
+
     fade = constrain(fade, 0, 255);
 
+    const ctx = drawingContext;
+
+    ctx.save();
+
+    // Create a donut-shaped clipping region.
+    ctx.beginPath();
+
+    ctx.arc(cx, cy, outerRadius, 0, TWO_PI, false);
+
+    if (innerRadius > 0) {
+      ctx.arc(cx, cy, innerRadius, 0, TWO_PI, true);
+    }
+
+    ctx.clip("evenodd");
+
+    // Reveal the saved world through the ring.
+    push();
+
     tint(0, 120, 255, fade);
-    image(maskedBlue, 0, 0);
+
+    image(baseWorldFrame, 0, 0, width, height);
+
     noTint();
+
+    pop();
+
+    ctx.restore();
   }
 
   // TIMER
@@ -3332,11 +3411,15 @@ function startWaveForFrame(frameIndex) {
   if (gameEnded || gameState === "loss") {
     waveActive = false;
     waveDelayActive = false;
+    waveNeedsCapture = false;
     return;
   }
 
   waveActive = true;
   waveRadius = 0;
+
+  // Capture the world only ONCE for this stomp.
+  waveNeedsCapture = true;
 
   if (stompAura && stompAura.isLoaded()) {
     stompAura.play();
@@ -3493,10 +3576,10 @@ function mousePressed() {
 
   // Open the pause menu from the settings button.
   if (gameState === "playing" && !isGamePaused && isSettingsButtonHovered()) {
-  playButton1Sound();
-  openPauseMenu();
-  return;
-}
+    playButton1Sound();
+    openPauseMenu();
+    return;
+  }
 
   if (gameState === "story") {
     handleStoryClick();
@@ -3609,30 +3692,30 @@ function mousePressed() {
 function mouseReleased() {
   // Pause-menu button releases.
   if (gameState === "playing" && isGamePaused) {
-  if (resumeBtnPressed && pointInsidePauseButton(PAUSE_RESUME_BTN)) {
-    playButton1Sound();
-    closePauseMenu();
+    if (resumeBtnPressed && pointInsidePauseButton(PAUSE_RESUME_BTN)) {
+      playButton1Sound();
+      closePauseMenu();
+      return;
+    }
+
+    if (restartBtnPressed && pointInsidePauseButton(PAUSE_RESTART_BTN)) {
+      playButton1Sound();
+      restartCurrentLevel();
+      return;
+    }
+
+    if (homeBtnPressed && pointInsidePauseButton(PAUSE_HOME_BTN)) {
+      playButton1Sound();
+      returnToHomeFromPause();
+      return;
+    }
+
+    resumeBtnPressed = false;
+    restartBtnPressed = false;
+    homeBtnPressed = false;
+
     return;
   }
-
-  if (restartBtnPressed && pointInsidePauseButton(PAUSE_RESTART_BTN)) {
-    playButton1Sound();
-    restartCurrentLevel();
-    return;
-  }
-
-  if (homeBtnPressed && pointInsidePauseButton(PAUSE_HOME_BTN)) {
-    playButton1Sound();
-    returnToHomeFromPause();
-    return;
-  }
-
-  resumeBtnPressed = false;
-  restartBtnPressed = false;
-  homeBtnPressed = false;
-
-  return;
-}
 
   // --- TUTORIAL MOUSE INPUT (tutorial_cards.js) ---
   if (handleTutorialMouseReleased()) return;
@@ -3660,107 +3743,107 @@ function mouseReleased() {
   }
 
   // --- WIN / LOSS BUTTON RELEASES ---
-if (gameState === "win" || (gameState === "loss" && lossVideoFinished)) {
-  // ------------------------------------------------------------
-  // LEVEL PICKER BUTTON
-  // ------------------------------------------------------------
-  let lpBx;
-  let lpBy;
+  if (gameState === "win" || (gameState === "loss" && lossVideoFinished)) {
+    // ------------------------------------------------------------
+    // LEVEL PICKER BUTTON
+    // ------------------------------------------------------------
+    let lpBx;
+    let lpBy;
 
-  if (gameState === "loss") {
-    lpBx = width / 2 + 400;
-    lpBy = height * 0.65;
-  } else {
-    lpBx = width / 2;
-    lpBy = height * 0.9;
-  }
-
-  const lpBw = 320;
-  const lpBh = 56;
-
-  const lpHover =
-    mouseX > lpBx - lpBw / 2 &&
-    mouseX < lpBx + lpBw / 2 &&
-    mouseY > lpBy - lpBh / 2 &&
-    mouseY < lpBy + lpBh / 2;
-
-  if (levelPickerBtnPressed && lpHover) {
-    // Loss-screen Level Picker uses button_2.
-    // Win-screen Level Picker keeps the original sound.
     if (gameState === "loss") {
-      playButton2Sound();
+      lpBx = width / 2 + 400;
+      lpBy = height * 0.65;
     } else {
-      playButtonClickSound();
+      lpBx = width / 2;
+      lpBy = height * 0.9;
     }
 
-    if (gameState === "win" && currentLevel === 3) {
+    const lpBw = 320;
+    const lpBh = 56;
+
+    const lpHover =
+      mouseX > lpBx - lpBw / 2 &&
+      mouseX < lpBx + lpBw / 2 &&
+      mouseY > lpBy - lpBh / 2 &&
+      mouseY < lpBy + lpBh / 2;
+
+    if (levelPickerBtnPressed && lpHover) {
+      // Loss-screen Level Picker uses button_2.
+      // Win-screen Level Picker keeps the original sound.
+      if (gameState === "loss") {
+        playButton2Sound();
+      } else {
+        playButtonClickSound();
+      }
+
+      if (gameState === "win" && currentLevel === 3) {
+        levelPickerBtnPressed = false;
+        lossBtnPressed = false;
+        winBtnPressed = false;
+
+        beginWinStory();
+        return;
+      }
+
+      startLevelPickerTransition();
+
       levelPickerBtnPressed = false;
       lossBtnPressed = false;
       winBtnPressed = false;
-
-      beginWinStory();
       return;
     }
 
-    startLevelPickerTransition();
+    // ------------------------------------------------------------
+    // TRY AGAIN BUTTON
+    // ------------------------------------------------------------
+    const lossBx = width / 2 + 400;
+    const lossBy = height * 0.55;
+    const lossBw = 320;
+    const lossBh = 64;
 
+    const lossHover =
+      mouseX > lossBx - lossBw / 2 &&
+      mouseX < lossBx + lossBw / 2 &&
+      mouseY > lossBy - lossBh / 2 &&
+      mouseY < lossBy + lossBh / 2;
+
+    if (gameState === "loss" && lossBtnPressed && lossHover) {
+      playButton2Sound();
+
+      // Stop and reset the death video before gameplay begins again.
+      stopLossVideos();
+
+      // Rebuild and reset the current level.
+      loadLevel(currentLevel);
+      resetGame();
+
+      // Skip tutorials because this is Try Again.
+      tutorialActive = false;
+      postTutorialTimerActive = false;
+      tutorialIndex = 999;
+
+      level2CardActive = false;
+      level3CardActive = false;
+
+      // Start a completely fresh attempt.
+      startTime = millis();
+      timerStarted = true;
+      gameEnded = false;
+      finalTime = null;
+
+      gameState = "playing";
+      cursor(ARROW);
+
+      levelPickerBtnPressed = false;
+      lossBtnPressed = false;
+      winBtnPressed = false;
+      return;
+    }
+
+    // Reset pressed states when the mouse is released elsewhere.
     levelPickerBtnPressed = false;
     lossBtnPressed = false;
     winBtnPressed = false;
     return;
   }
-
-  // ------------------------------------------------------------
-  // TRY AGAIN BUTTON
-  // ------------------------------------------------------------
-  const lossBx = width / 2 + 400;
-  const lossBy = height * 0.55;
-  const lossBw = 320;
-  const lossBh = 64;
-
-  const lossHover =
-    mouseX > lossBx - lossBw / 2 &&
-    mouseX < lossBx + lossBw / 2 &&
-    mouseY > lossBy - lossBh / 2 &&
-    mouseY < lossBy + lossBh / 2;
-
-  if (gameState === "loss" && lossBtnPressed && lossHover) {
-    playButton2Sound();
-
-    // Stop and reset the death video before gameplay begins again.
-    stopLossVideos();
-
-    // Rebuild and reset the current level.
-    loadLevel(currentLevel);
-    resetGame();
-
-    // Skip tutorials because this is Try Again.
-    tutorialActive = false;
-    postTutorialTimerActive = false;
-    tutorialIndex = 999;
-
-    level2CardActive = false;
-    level3CardActive = false;
-
-    // Start a completely fresh attempt.
-    startTime = millis();
-    timerStarted = true;
-    gameEnded = false;
-    finalTime = null;
-
-    gameState = "playing";
-    cursor(ARROW);
-
-    levelPickerBtnPressed = false;
-    lossBtnPressed = false;
-    winBtnPressed = false;
-    return;
-  }
-
-  // Reset pressed states when the mouse is released elsewhere.
-  levelPickerBtnPressed = false;
-  lossBtnPressed = false;
-  winBtnPressed = false;
-  return;
-}
 }

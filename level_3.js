@@ -15,6 +15,7 @@ const LEVEL3_HOLES = [
 ];
 
 let avalancheCard3;
+let stopSignCard;
 let level3CardActive = false;
 let level3CardStep = 0;
 
