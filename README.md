@@ -89,9 +89,6 @@ After playtesting, we implemented three major refinements to improve clarity, im
 | `assets/win_screen_story_panel_2.png`          | Generated with ChatGPT.com                             |
 | `assets/win_screen_story_panel_3.png`          | Generated with ChatGPT.com                             |
 | `assets/win_screen_story_panel_4.png`          | Generated with ChatGPT.com                             |
-| `assets/sound/Story_Audio_But_Why.mp3`         | @midjourney.image – TikTok                             |
-| `assets/sound/StoryAudio.mp3`                  | @midjourney.image – TikTok                             |
-| `assets/images/level_info_box.png`             | Generated with ChatGPT.com                             |
 | `assets/sound/button_1.mp3`                    | floraphonic - Pixabay.com [2]                          |
 | `assets/sound/button_2.mp3`                    | Leszek_Szary (freesound_community) - Pixabay.com [3]   |
 | `assets/sound/lock_button.mp3`                 | Mendenhall02 (freesound_community) - Pixabay.com [4]   |
@@ -115,9 +112,9 @@ After playtesting, we implemented three major refinements to improve clarity, im
 
 [2]floraphonic. 2024. Multi Pop 2 | Royalty-free Music. Pixabay.com. Retrieved August 6, 2026 from https://pixabay.com/sound-effects/film-special-effects-multi-pop-2-188167/
 
-[3]Leszek_Szary freesound_community. 2023. menu button | Royalty-free Music. Pixabay.com. Retrieved August 6, 2026 from https://pixabay.com/sound-effects/film-special-effects-menu-button-89141/
+[3]Leszek_Szary freesound_community. 2022. menu button | Royalty-free Music. Pixabay.com. Retrieved August 6, 2026 from https://pixabay.com/sound-effects/film-special-effects-menu-button-89141/
 
-[4]Mendenhall02 freesound_community. 2023. Denied sound | Royalty-free Music. Pixabay.com. Retrieved August 6, 2026 from https://pixabay.com/sound-effects/film-special-effects-denied-sound-39708/
+[4]Mendenhall02 freesound_community. 2022. Denied sound | Royalty-free Music. Pixabay.com. Retrieved August 6, 2026 from https://pixabay.com/sound-effects/film-special-effects-denied-sound-39708/
 
 [5]HauntSync. 2026. Whiteout Valley - Blizzard Ambient Loop with Howling Hillside Winds | Royalty-free Music. Pixabay.com. Retrieved August 7, 2026 from https://pixabay.com/sound-effects/nature-whiteout-valley-blizzard-ambient-loop-with-howling-hillside-winds-563822/
 
