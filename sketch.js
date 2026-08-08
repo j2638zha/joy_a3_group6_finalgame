@@ -21,6 +21,9 @@ let fishCollect;
 let goatSound;
 let timerSound;
 let buttonClickSound;
+let button1Sound;     // Used by level circles and How to Play X button
+let button2Sound;     // Used by How to Play, Try Again, and loss Level Picker
+let lockButtonSound;
 let fishCallFar = []; // "searching" clips — [0] = "come find me", [1] = "I'm here"
 let fishCallNear; // plays when penguin is close
 let winSound;
@@ -442,6 +445,39 @@ function playButtonClickSound() {
   }
 }
 
+function playButton1Sound() {
+  if (button1Sound && button1Sound.isLoaded()) {
+    if (button1Sound.isPlaying()) {
+      button1Sound.stop();
+    }
+
+    button1Sound.setVolume(0.5);
+    button1Sound.play();
+  }
+}
+
+function playButton2Sound() {
+  if (button2Sound && button2Sound.isLoaded()) {
+    if (button2Sound.isPlaying()) {
+      button2Sound.stop();
+    }
+
+    button2Sound.setVolume(0.5);
+    button2Sound.play();
+  }
+}
+
+function playLockButtonSound() {
+  if (lockButtonSound && lockButtonSound.isLoaded()) {
+    if (lockButtonSound.isPlaying()) {
+      lockButtonSound.stop();
+    }
+
+    lockButtonSound.setVolume(0.5);
+    lockButtonSound.play();
+  }
+}
+
 // Builds the world (background, walls, spikes, fish) for whichever
 // level number is passed in. Call this before resetGame() whenever
 // the player enters a level.
@@ -810,6 +846,9 @@ function preload() {
   goatSound = loadSound("assets/sounds/goat_sound.mp3");
   timerSound = loadSound("assets/sounds/timer_sound.mp3");
   buttonClickSound = loadSound("assets/sounds/button_click_sound.mp3");
+  button1Sound = loadSound("assets/sounds/button_1.mp3");
+  button2Sound = loadSound("assets/sounds/button_2.mp3");
+  lockButtonSound = loadSound("assets/sounds/lock_button.mp3");
   fishCallFar[0] = loadSound("assets/sounds/shelby_comefindme.mp3");
   fishCallFar[1] = loadSound("assets/sounds/shelby_imhere.mp3");
   fishCallNear = loadSound("assets/sounds/shelby_imnearyou.mp3");
@@ -1615,6 +1654,7 @@ function playStompFishCall() {
   if (
     !allowStompEndCallback ||
     !blockFishSounds ||
+    fish.collected ||
     gameEnded ||
     gameState === "loss"
   ) {
@@ -2178,6 +2218,7 @@ function draw() {
     foundFishMessageTimer--;
     push();
     imageMode(CENTER);
+    let foundCardBottomY = 180;
     if (
       foundPopupCard &&
       foundPopupCard.width > 0 &&
@@ -2187,8 +2228,28 @@ function draw() {
       const cardH = cardW * (foundPopupCard.height / foundPopupCard.width);
       const cardY = 180;
       image(foundPopupCard, width / 2, cardY, cardW, cardH);
+      foundCardBottomY = cardY + cardH / 2;
     }
     pop();
+
+    // Clarifies where the "safety zone" actually is, since playtesters
+    // couldn't tell after finding the fish. Drawn as text (not baked
+    // into the card art) so it doesn't need a redesigned image.
+    push();
+    textFont(gameFont);
+    textAlign(CENTER, TOP);
+    textStyle(BOLD);
+    textSize(28);
+    fill(210, 230, 255);
+    stroke(10, 15, 54);
+    strokeWeight(5);
+    text(
+      "Get to the top of the mountain — that's the safety zone!",
+      width / 2,
+      foundCardBottomY + 14,
+    );
+    pop();
+
     if (foundFishMessageTimer <= 0) {
       foundFishMessageActive = false;
     }
@@ -2287,7 +2348,7 @@ function keyPressed() {
 
   // ESC opens and closes the pause menu during gameplay.
   if (gameState === "playing" && keyCode === ESCAPE) {
-    playButtonClickSound();
+    playButton1Sound();
 
     if (isGamePaused) {
       closePauseMenu();
@@ -3432,10 +3493,10 @@ function mousePressed() {
 
   // Open the pause menu from the settings button.
   if (gameState === "playing" && !isGamePaused && isSettingsButtonHovered()) {
-    playButtonClickSound();
-    openPauseMenu();
-    return;
-  }
+  playButton1Sound();
+  openPauseMenu();
+  return;
+}
 
   if (gameState === "story") {
     handleStoryClick();
@@ -3548,30 +3609,30 @@ function mousePressed() {
 function mouseReleased() {
   // Pause-menu button releases.
   if (gameState === "playing" && isGamePaused) {
-    if (resumeBtnPressed && pointInsidePauseButton(PAUSE_RESUME_BTN)) {
-      playButtonClickSound();
-      closePauseMenu();
-      return;
-    }
-
-    if (restartBtnPressed && pointInsidePauseButton(PAUSE_RESTART_BTN)) {
-      playButtonClickSound();
-      restartCurrentLevel();
-      return;
-    }
-
-    if (homeBtnPressed && pointInsidePauseButton(PAUSE_HOME_BTN)) {
-      playButtonClickSound();
-      returnToHomeFromPause();
-      return;
-    }
-
-    resumeBtnPressed = false;
-    restartBtnPressed = false;
-    homeBtnPressed = false;
-
+  if (resumeBtnPressed && pointInsidePauseButton(PAUSE_RESUME_BTN)) {
+    playButton1Sound();
+    closePauseMenu();
     return;
   }
+
+  if (restartBtnPressed && pointInsidePauseButton(PAUSE_RESTART_BTN)) {
+    playButton1Sound();
+    restartCurrentLevel();
+    return;
+  }
+
+  if (homeBtnPressed && pointInsidePauseButton(PAUSE_HOME_BTN)) {
+    playButton1Sound();
+    returnToHomeFromPause();
+    return;
+  }
+
+  resumeBtnPressed = false;
+  restartBtnPressed = false;
+  homeBtnPressed = false;
+
+  return;
+}
 
   // --- TUTORIAL MOUSE INPUT (tutorial_cards.js) ---
   if (handleTutorialMouseReleased()) return;
@@ -3598,85 +3659,108 @@ function mouseReleased() {
     return;
   }
 
-  // --- LEVEL PICKER PLAY BUTTON RELEASE ---
-  if (gameState === "level_picker" && activePanelIndex !== -1) {
-    let i = activePanelIndex;
+  // --- WIN / LOSS BUTTON RELEASES ---
+if (gameState === "win" || (gameState === "loss" && lossVideoFinished)) {
+  // ------------------------------------------------------------
+  // LEVEL PICKER BUTTON
+  // ------------------------------------------------------------
+  let lpBx;
+  let lpBy;
 
-    if (playBtnPressed[i] && levelPanels[i].playHover) {
-      playButtonClickSound();
-      startLevel(i);
-    }
-
-    playBtnPressed[i] = false;
-    return;
+  if (gameState === "loss") {
+    lpBx = width / 2 + 400;
+    lpBy = height * 0.65;
+  } else {
+    lpBx = width / 2;
+    lpBy = height * 0.9;
   }
 
-  // --- WIN / LOSS BUTTON RELEASES ---
-  if (gameState === "win" || (gameState === "loss" && lossVideoFinished)) {
-    // Level Picker button
-    let lpBx, lpBy;
+  const lpBw = 320;
+  const lpBh = 56;
+
+  const lpHover =
+    mouseX > lpBx - lpBw / 2 &&
+    mouseX < lpBx + lpBw / 2 &&
+    mouseY > lpBy - lpBh / 2 &&
+    mouseY < lpBy + lpBh / 2;
+
+  if (levelPickerBtnPressed && lpHover) {
+    // Loss-screen Level Picker uses button_2.
+    // Win-screen Level Picker keeps the original sound.
     if (gameState === "loss") {
-      lpBx = width / 2 + 400;
-      lpBy = height * 0.65;
+      playButton2Sound();
     } else {
-      lpBx = width / 2;
-      lpBy = height * 0.9;
-    }
-    let lpBw = 320,
-      lpBh = 56;
-    let lpHover =
-      mouseX > lpBx - lpBw / 2 &&
-      mouseX < lpBx + lpBw / 2 &&
-      mouseY > lpBy - lpBh / 2 &&
-      mouseY < lpBy + lpBh / 2;
-
-    if (levelPickerBtnPressed && lpHover) {
       playButtonClickSound();
-      if (gameState === "win" && currentLevel === 3) {
-        // Finished the last level → roll the ending story + credits.
-        levelPickerBtnPressed = false;
-        lossBtnPressed = false;
-        winBtnPressed = false;
-        beginWinStory();
-        return;
-      }
-      if ((gameState === "win" && currentLevel === 1) || gameState === "loss") {
-        startLevelPickerTransition();
-      } else {
-        gameState = "level_picker";
-      }
     }
 
-    let lossBx = width / 2 + 400,
-      lossBy = height * 0.55,
-      lossBw = 320,
-      lossBh = 64;
-    let lossHover =
-      mouseX > lossBx - lossBw / 2 &&
-      mouseX < lossBx + lossBw / 2 &&
-      mouseY > lossBy - lossBh / 2 &&
-      mouseY < lossBy + lossBh / 2;
+    if (gameState === "win" && currentLevel === 3) {
+      levelPickerBtnPressed = false;
+      lossBtnPressed = false;
+      winBtnPressed = false;
 
-    if (lossBtnPressed && lossHover && gameState === "loss") {
-      playButtonClickSound();
-      resetGame();
-
-      startTime = millis();
-      timerStarted = true;
-      gameEnded = false;
-      finalTime = null;
-
-      tutorialActive = false;
-      postTutorialTimerActive = false;
-      tutorialIndex = 999;
-
-      gameState = "playing";
-      cursor(ARROW);
+      beginWinStory();
+      return;
     }
+
+    startLevelPickerTransition();
 
     levelPickerBtnPressed = false;
     lossBtnPressed = false;
     winBtnPressed = false;
     return;
   }
+
+  // ------------------------------------------------------------
+  // TRY AGAIN BUTTON
+  // ------------------------------------------------------------
+  const lossBx = width / 2 + 400;
+  const lossBy = height * 0.55;
+  const lossBw = 320;
+  const lossBh = 64;
+
+  const lossHover =
+    mouseX > lossBx - lossBw / 2 &&
+    mouseX < lossBx + lossBw / 2 &&
+    mouseY > lossBy - lossBh / 2 &&
+    mouseY < lossBy + lossBh / 2;
+
+  if (gameState === "loss" && lossBtnPressed && lossHover) {
+    playButton2Sound();
+
+    // Stop and reset the death video before gameplay begins again.
+    stopLossVideos();
+
+    // Rebuild and reset the current level.
+    loadLevel(currentLevel);
+    resetGame();
+
+    // Skip tutorials because this is Try Again.
+    tutorialActive = false;
+    postTutorialTimerActive = false;
+    tutorialIndex = 999;
+
+    level2CardActive = false;
+    level3CardActive = false;
+
+    // Start a completely fresh attempt.
+    startTime = millis();
+    timerStarted = true;
+    gameEnded = false;
+    finalTime = null;
+
+    gameState = "playing";
+    cursor(ARROW);
+
+    levelPickerBtnPressed = false;
+    lossBtnPressed = false;
+    winBtnPressed = false;
+    return;
+  }
+
+  // Reset pressed states when the mouse is released elsewhere.
+  levelPickerBtnPressed = false;
+  lossBtnPressed = false;
+  winBtnPressed = false;
+  return;
+}
 }

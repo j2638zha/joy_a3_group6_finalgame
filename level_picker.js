@@ -465,7 +465,7 @@ function handleLevelPickerClick() {
       mouseY >= closeY &&
       mouseY <= closeY + CLOSE_BTN_SIZE
     ) {
-      playButtonClickSound();
+      playButton1Sound();
       infoOpen = false;
       return;
     }
@@ -477,7 +477,7 @@ function handleLevelPickerClick() {
     mouseY >= HOW_TO_PLAY_Y &&
     mouseY <= HOW_TO_PLAY_Y + HOW_TO_PLAY_H
   ) {
-    playButtonClickSound();
+    playButton2Sound();
     infoOpen = !infoOpen;
     return;
   }
@@ -489,12 +489,14 @@ function handleLevelPickerClick() {
   let radius = 73 / 2;
 
   for (let i = 0; i < 3; i++) {
-    let unlocked = isLevelUnlocked(i);
+    const unlocked = isLevelUnlocked(i);
+    const d = dist(mouseX, mouseY, cx[i], cy[i]);
 
-    let d = dist(mouseX, mouseY, cx[i], cy[i]);
     if (d < radius) {
       if (!unlocked) {
-        playButtonClickSound();
+        // Locked Level 2 or Level 3.
+        playLockButtonSound();
+
         levelShake[i] = 10;
         activePanelIndex = -1;
         isClosingPanel = false;
@@ -502,7 +504,8 @@ function handleLevelPickerClick() {
         return;
       }
 
-      playButtonClickSound();
+      // Unlocked Level 1, Level 2 or Level 3.
+      playButton1Sound();
 
       if (activePanelIndex === i) {
         activePanelIndex = -1;

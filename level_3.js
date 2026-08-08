@@ -15,7 +15,6 @@ const LEVEL3_HOLES = [
 ];
 
 let avalancheCard3;
-let goatCard;
 let level3CardActive = false;
 let level3CardStep = 0;
 
@@ -28,7 +27,6 @@ const STOPSIGN_TOTAL_FRAMES =
 
 function preloadLevel3Assets() {
   avalancheCard3 = loadImage("assets/images/avalanche_card3.png");
-  goatCard = loadImage("assets/images/goat_card.png");
   stopSignCard = loadImage("assets/images/stopsign_card.png");
 }
 
@@ -60,11 +58,11 @@ function handleLevel3CardKeyPressed() {
   if (gameState !== "level3_card" || keyCode !== ENTER) return false;
 
   // Once the stop sign card starts, it dismisses itself — ignore input.
-  if (level3CardStep >= 2) return true;
+  if (level3CardStep >= 1) return true;
 
   level3CardStep++;
 
-  if (level3CardStep === 2) {
+  if (level3CardStep === 1) {
     stopSignTimer = 0; // start the auto-dismiss animation
   }
 
@@ -77,11 +75,11 @@ function handleLevel3CardMousePressed() {
   if (gameState !== "level3_card") return false;
 
   // Once the stop sign card starts, it dismisses itself — ignore input.
-  if (level3CardStep >= 2) return true;
+  if (level3CardStep >= 1) return true;
 
   level3CardStep++;
 
-  if (level3CardStep === 2) {
+  if (level3CardStep === 1) {
     stopSignTimer = 0; // start the auto-dismiss animation
   }
 
@@ -96,8 +94,6 @@ function drawLevel3CardOverlay() {
   if (level3CardStep === 0) {
     drawDialogueCard(avalancheCard3);
   } else if (level3CardStep === 1) {
-    drawDialogueCard(goatCard);
-  } else if (level3CardStep === 2) {
     drawStopSignCard();
   }
 }
